@@ -32,6 +32,15 @@ class Document(Base):
     content = Column(Text, comment="提取的文本内容")
     uploaded_at = Column(DateTime, default=datetime.now, comment="上传时间")
 
+class Chunk(Base):
+    """文档分块表，用于RAG向量检索"""
+    __tablename__ = "chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doc_id = Column(Integer, nullable=False, comment="关联documents表id")
+    chunk_text = Column(Text, comment="分块文本")
+    embedding = Column(Text, comment="向量json字符串")
+
 # ========== 建表 ==========
 
 def init_db():
