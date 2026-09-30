@@ -13,7 +13,8 @@ from database import (
     UPLOAD_DIR
 )
 from rag import save_chunks_to_db, search_top3_chunks
-from llm import chat_with_llm
+from llm import chat_with_llm, classify_document
+
 
 # ---------------------- 日志配置 ----------------------
 logging.basicConfig(
@@ -43,7 +44,7 @@ def read_root():
 # ========== 文档上传接口 ==========
 @app.post("/upload/", summary="上传文档")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """上传PDF或Word文档，自动提取文字存入数据库"""
+    """上传PDF或Word文档，自动提取文字存入数据库，自动分类"""
     ext = file.filename.lower().split(".")[-1]
     if ext == "pdf":
         filetype = "pdf"
@@ -66,13 +67,22 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
     if doc.content and len(doc.content.strip()) > 0:
         save_chunks_to_db("./campus.db", doc.id, doc.content)
+        # 自动调用大模型给文档打分类标签
+        try:
+            auto_cat = classify_document(doc.content)
+            doc.category = auto_cat
+            db.commit()
+            logger.info(f"文档《{doc.filename}》自动分类结果：{auto_cat}")
+        except Exception as e:
+            logger.warning(f"自动分类失败，默认归为未分类：{str(e)}")
 
     return {
         "msg": "上传成功",
         "doc_id": doc.id,
         "filename": doc.filename,
         "content_length": len(content),
-        "preview": content[:200] + "..." if len(content) > 200 else content
+        "preview": content[:200] + "..." if len(content) > 200 else content,
+        "category": doc.category
     }
 
 # ========== 文档列表接口 ==========
@@ -84,6 +94,7 @@ def get_documents(db: Session = Depends(get_db)):
             "id": d.id,
             "filename": d.filename,
             "filetype": d.filetype,
+            "category": d.category,
             "uploaded_at": d.uploaded_at.isoformat(),
             "content_length": len(d.content) if d.content else 0
         }
@@ -93,7 +104,7 @@ def get_documents(db: Session = Depends(get_db)):
 @app.get("/documents/search/", summary="按文件名搜索文档")
 def search_docs(keyword: str, db: Session = Depends(get_db)):
     docs = search_documents(db, keyword)
-    return [{"id": d.id, "filename": d.filename, "filetype": d.filetype} for d in docs]
+    return [{"id": d.id, "filename": d.filename, "filetype": d.filetype, "category": d.category} for d in docs]
 
 @app.get("/documents/{doc_id}", summary="查看文档详情")
 def get_doc_detail(doc_id: int, db: Session = Depends(get_db)):
@@ -104,6 +115,7 @@ def get_doc_detail(doc_id: int, db: Session = Depends(get_db)):
         "id": doc.id,
         "filename": doc.filename,
         "filetype": doc.filetype,
+        "category": doc.category,
         "uploaded_at": doc.uploaded_at.isoformat(),
         "content": doc.content
     }
@@ -150,6 +162,7 @@ def admin_get_all_docs(
             "id": item.id,
             "filename": item.filename,
             "filetype": item.filetype,
+            "category": item.category,
             "uploaded_at": item.uploaded_at.isoformat() if item.uploaded_at else None
         })
     logger.info(f"管理员查看全部文档，共{len(result)}条记录")
@@ -168,7 +181,6 @@ def ask_question(question: str, db: Session = Depends(get_db)):
             "sources": []
         }
 
-    # 拼prompt，强制模型只根据文档内容回答
     context = "\n---\n".join([r["text"] for r in top_results])
     prompt = f"""你是校园资料助手，必须严格根据下面给出的文档片段回答学生问题，
     如果文档里没有相关内容，就直接说"根据现有资料暂时找不到相关信息"，绝对不允许编造内容。
@@ -179,13 +191,11 @@ def ask_question(question: str, db: Session = Depends(get_db)):
     学生问题：{question}
     请用简洁通顺的中文回答："""
 
-    # 调用本地大模型
     try:
         ai_answer = chat_with_llm(prompt)
     except Exception as e:
         return {"error": f"本地大模型连接失败，请确认Ollama后台已启动: {str(e)}", "sources": []}
 
-    # 整理溯源信息
     sources = []
     seen_doc_ids = set()
     for item in top_results:
