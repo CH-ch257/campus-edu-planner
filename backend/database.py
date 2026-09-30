@@ -32,6 +32,9 @@ class Document(Base):
     content = Column(Text, comment="提取的文本内容")
     uploaded_at = Column(DateTime, default=datetime.now, comment="上传时间")
 
+    category = Column(String(50), default="未分类", comment="文档自动分类")
+    category_confirmed = Column(Integer, default=0, comment="0=AI自动分类，1=管理员人工修正过")
+
 class Chunk(Base):
     """文档分块表，用于RAG向量检索"""
     __tablename__ = "chunks"
