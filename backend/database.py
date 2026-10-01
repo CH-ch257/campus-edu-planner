@@ -35,6 +35,10 @@ class Document(Base):
     category = Column(String(50), default="未分类", comment="文档自动分类")
     category_confirmed = Column(Integer, default=0, comment="0=AI自动分类，1=管理员人工修正过")
 
+    version = Column(Integer, default=1, comment="文档版本号")
+    is_latest = Column(Integer, default=1, comment="是否最新版本：1=是，0=历史版本")
+    parent_doc_id = Column(Integer, nullable=True, comment="关联上一版本的文档id")
+
 class Chunk(Base):
     """文档分块表，用于RAG向量检索"""
     __tablename__ = "chunks"
