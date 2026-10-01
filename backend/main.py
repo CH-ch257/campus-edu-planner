@@ -10,7 +10,7 @@ from database import (
     init_db, get_db, save_document, list_documents,
     search_documents, get_document_by_id,
     extract_text_from_pdf, extract_text_from_word,
-    UPLOAD_DIR
+    UPLOAD_DIR, Document
 )
 from rag import save_chunks_to_db, search_top3_chunks
 from llm import chat_with_llm, classify_document
@@ -48,8 +48,7 @@ async def upload_document(
     admin_secret: str = Query(..., description="管理员操作密钥"),
     db: Session = Depends(get_db)
 ):
-    """上传PDF或Word文档，自动提取文字存入数据库，自动分类"""
-    # 校验管理员密钥
+    """上传PDF或Word文档，自动提取文字存入数据库，自动分类，自动版本升级"""
     if admin_secret != ADMIN_SECRET:
         logger.warning(f"非管理员尝试上传文档，密钥错误")
         raise HTTPException(status_code=403, detail="权限不足，只有管理员才能上传文档")
@@ -74,9 +73,20 @@ async def upload_document(
 
     doc = save_document(db, file.filename, filetype, file_path, content)
 
+    # 检查是否有同名旧版本文档，自动做版本升级
+    old_latest = db.query(Document).filter(
+        Document.filename == file.filename,
+        Document.is_latest == 1
+    ).first()
+    if old_latest:
+        old_latest.is_latest = 0
+        doc.version = old_latest.version + 1
+        doc.parent_doc_id = old_latest.id
+        logger.info(f"检测到同名旧文档，升级版本号至v{doc.version}")
+    db.commit()
+
     if doc.content and len(doc.content.strip()) > 0:
         save_chunks_to_db("./campus.db", doc.id, doc.content)
-        # 自动调用大模型给文档打分类标签
         try:
             auto_cat = classify_document(doc.content)
             doc.category = auto_cat
@@ -89,21 +99,23 @@ async def upload_document(
         "msg": "上传成功",
         "doc_id": doc.id,
         "filename": doc.filename,
+        "version": doc.version,
         "content_length": len(content),
         "preview": content[:200] + "..." if len(content) > 200 else content,
         "category": doc.category
     }
 
-# ========== 文档列表接口（学生可访问） ==========
-@app.get("/documents/", summary="获取全部文档列表")
+# ========== 文档列表接口（学生只看最新版） ==========
+@app.get("/documents/", summary="获取全部最新文档列表")
 def get_documents(db: Session = Depends(get_db)):
-    docs = list_documents(db)
+    docs = db.query(Document).filter(Document.is_latest == 1).order_by(Document.uploaded_at.desc()).all()
     return [
         {
             "id": d.id,
             "filename": d.filename,
             "filetype": d.filetype,
             "category": d.category,
+            "version": d.version,
             "uploaded_at": d.uploaded_at.isoformat(),
             "content_length": len(d.content) if d.content else 0
         }
@@ -112,8 +124,8 @@ def get_documents(db: Session = Depends(get_db)):
 
 @app.get("/documents/search/", summary="按文件名搜索文档")
 def search_docs(keyword: str, db: Session = Depends(get_db)):
-    docs = search_documents(db, keyword)
-    return [{"id": d.id, "filename": d.filename, "filetype": d.filetype, "category": d.category} for d in docs]
+    docs = db.query(Document).filter(Document.filename.contains(keyword), Document.is_latest == 1).all()
+    return [{"id": d.id, "filename": d.filename, "filetype": d.filetype, "category": d.category, "version": d.version} for d in docs]
 
 @app.get("/documents/{doc_id}", summary="查看文档详情")
 def get_doc_detail(doc_id: int, db: Session = Depends(get_db)):
@@ -125,6 +137,7 @@ def get_doc_detail(doc_id: int, db: Session = Depends(get_db)):
         "filename": doc.filename,
         "filetype": doc.filetype,
         "category": doc.category,
+        "version": doc.version,
         "uploaded_at": doc.uploaded_at.isoformat(),
         "content": doc.content
     }
@@ -185,7 +198,6 @@ def admin_get_all_docs(
     if admin_secret != ADMIN_SECRET:
         logger.warning("非法访问管理员文档列表，密钥错误")
         raise HTTPException(status_code=403, detail="权限不足，不是管理员")
-
     all_docs = list_documents(db)
     result = []
     for item in all_docs:
@@ -194,10 +206,34 @@ def admin_get_all_docs(
             "filename": item.filename,
             "filetype": item.filetype,
             "category": item.category,
+            "version": item.version,
+            "is_latest": item.is_latest,
             "uploaded_at": item.uploaded_at.isoformat() if item.uploaded_at else None
         })
     logger.info(f"管理员查看全部文档，共{len(result)}条记录")
     return result
+
+# ========== 管理员：查看文档历史版本 ==========
+@app.get("/admin/documents/{doc_id}/versions", summary="【管理员专用】查看文档所有历史版本")
+def get_doc_versions(
+    doc_id: int,
+    admin_secret: str = Query(..., description="管理员操作密钥"),
+    db: Session = Depends(get_db)
+):
+    if admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="权限不足")
+    all_versions = []
+    current_doc = get_document_by_id(db, doc_id)
+    while current_doc:
+        all_versions.append({
+            "id": current_doc.id,
+            "filename": current_doc.filename,
+            "version": current_doc.version,
+            "is_latest": current_doc.is_latest,
+            "uploaded_at": current_doc.uploaded_at.isoformat()
+        })
+        current_doc = get_document_by_id(db, current_doc.parent_doc_id) if current_doc.parent_doc_id else None
+    return all_versions
 
 # ========== RAG智能问答接口（学生可访问） ==========
 @app.post("/ask/", summary="RAG智能问答（本地大模型生成回答）")
