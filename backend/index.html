@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园资料AI检索助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f5f7fb; padding: 20px; }
+        .chat-box { height: 400px; overflow-y: auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        .source-tag { font-size: 12px; color: #666; margin-top: 8px; padding: 4px 8px; background: #f0f7ff; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mb-4">📚 校园资料AI检索助手</h2>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">智能问答</div>
+                    <div class="card-body">
+                        <div class="chat-box mb-3" id="chatBox">
+                            <div class="text-muted">你好！我是校园资料助手，可以问我关于上传文档里的内容哦~</div>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="questionInput" placeholder="输入你的问题...">
+                            <button class="btn btn-primary" onclick="askQuestion()">提问</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">📂 文档列表</div>
+                    <div class="card-body" id="docList">
+                        <div class="text-muted">加载中...</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">🔧 管理员入口</div>
+                    <div class="card-body">
+                        <input type="password" class="form-control mb-2" id="adminSecret" placeholder="管理员密钥">
+                        <input type="file" class="form-control mb-2" id="fileInput" accept=".pdf,.doc,.docx">
+                        <button class="btn btn-success w-100" onclick="uploadDoc()">上传文档</button>
+                        <div id="uploadStatus" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+        
+        // 页面加载时拉取文档列表
+        window.onload = function() {
+            loadDocs();
+        }
+
+        async function loadDocs() {
+            const res = await fetch(`${API_BASE}/documents/`);
+            const docs = await res.json();
+            const docList = document.getElementById('docList');
+            docList.innerHTML = docs.map(doc => `
+                <div class="border-bottom py-2">
+                    <div class="fw-bold">${doc.filename}</div>
+                    <span class="badge bg-info">${doc.category}</span>
+                    <span class="badge bg-secondary">v${doc.version}</span>
+                </div>
+            `).join('');
+        }
+
+        async function askQuestion() {
+            const q = document.getElementById('questionInput').value.trim();
+            if (!q) return;
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `<div class="text-end mb-2"><span class="badge bg-primary p-2">我：${q}</span></div>`;
+            document.getElementById('questionInput').value = '';
+            
+            const res = await fetch(`${API_BASE}/ask/?question=${encodeURIComponent(q)}`, {method: 'POST'});
+
+            const data = await res.json();
+            let sourcesHtml = '';
+            if (data.sources && data.sources.length > 0) {
+                sourcesHtml = `<div class="source-tag">📚 参考来源：${data.sources.map(s => s.doc_name).join('、')}</div>`;
+            }
+            chatBox.innerHTML += `<div class="mb-2"><span class="badge bg-light text-dark p-2">AI：${data.answer}</span>${sourcesHtml}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function uploadDoc() {
+            const secret = document.getElementById('adminSecret').value;
+            const file = document.getElementById('fileInput').files[0];
+            if (!secret || !file) {
+                document.getElementById('uploadStatus').innerHTML = '<div class="text-danger">请输入密钥并选择文件</div>';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch(`${API_BASE}/upload/?admin_secret=${secret}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.msg) {
+                document.getElementById('uploadStatus').innerHTML = `<div class="text-success">✅ 上传成功！自动分类：${data.category}</div>`;
+                loadDocs();
+            } else {
+                document.getElementById('uploadStatus').innerHTML = `<div class="text-danger">❌ ${data.detail || data.error}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

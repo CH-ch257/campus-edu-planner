@@ -115,3 +115,11 @@ def search_documents(db, keyword: str):
 def get_document_by_id(db, doc_id: int):
     """根据ID获取单篇文档"""
     return db.query(Document).filter(Document.id == doc_id).first()
+
+def extract_text_from_txt(file_path: str) -> str:
+    """从txt文件提取文本"""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception as e:
+        return f"[TXT提取失败: {e}]"

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import (
     init_db, get_db, save_document, list_documents,
     search_documents, get_document_by_id,
-    extract_text_from_pdf, extract_text_from_word,
+    extract_text_from_pdf, extract_text_from_word, extract_text_from_txt,
     UPLOAD_DIR, Document
 )
 from rag import save_chunks_to_db, search_top3_chunks
@@ -28,8 +28,17 @@ ADMIN_SECRET = "admin123456"
 
 app = FastAPI(
     title="校园资料AI检索助手",
-    description="上传PDF/Word校园资料，自动提取文本，支持文档检索与AI问答",
+    description="上传PDF/Word/TXT校园资料，自动提取文本，支持文档检索与AI问答",
     version="1.0.0"
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 启动时建表
@@ -48,7 +57,6 @@ async def upload_document(
     admin_secret: str = Query(..., description="管理员操作密钥"),
     db: Session = Depends(get_db)
 ):
-    """上传PDF或Word文档，自动提取文字存入数据库，自动分类，自动版本升级"""
     if admin_secret != ADMIN_SECRET:
         logger.warning(f"非管理员尝试上传文档，密钥错误")
         raise HTTPException(status_code=403, detail="权限不足，只有管理员才能上传文档")
@@ -58,8 +66,10 @@ async def upload_document(
         filetype = "pdf"
     elif ext in ["doc", "docx"]:
         filetype = "word"
+    elif ext == "txt":
+        filetype = "txt"
     else:
-        return {"error": "只支持PDF和Word文档"}
+        return {"error": "只支持PDF、Word和TXT文档"}
 
     safe_name = str(uuid.uuid4()) + "." + ext
     file_path = os.path.join(UPLOAD_DIR, safe_name)
@@ -68,12 +78,13 @@ async def upload_document(
 
     if filetype == "pdf":
         content = extract_text_from_pdf(file_path)
-    else:
+    elif filetype == "word":
         content = extract_text_from_word(file_path)
+    else:
+        content = extract_text_from_txt(file_path)
 
     doc = save_document(db, file.filename, filetype, file_path, content)
 
-    # 检查是否有同名旧版本文档，自动做版本升级
     old_latest = db.query(Document).filter(
         Document.filename == file.filename,
         Document.is_latest == 1
@@ -152,16 +163,13 @@ def delete_document(
     if admin_secret != ADMIN_SECRET:
         logger.warning(f"有人尝试删除文档id:{doc_id}，密钥错误，权限拒绝")
         raise HTTPException(status_code=403, detail="权限不足，不是管理员")
-
     doc_info = get_document_by_id(db, doc_id)
     if not doc_info:
         logger.info(f"管理员尝试删除文档id:{doc_id}，文档不存在")
         raise HTTPException(status_code=404, detail="找不到该文档")
-
     if os.path.exists(doc_info.file_path):
         os.remove(doc_info.file_path)
         logger.info(f"删除本地文件成功：{doc_info.file_path}")
-
     db.delete(doc_info)
     db.commit()
     logger.info(f"管理员成功删除文档 id:{doc_id}，原文件名：{doc_info.filename}")
@@ -240,14 +248,12 @@ def get_doc_versions(
 def ask_question(question: str, db: Session = Depends(get_db)):
     if not question.strip():
         return {"error": "问题不能为空"}
-
     top_results = search_top3_chunks("./campus.db", question)
     if not top_results:
         return {
             "answer": "系统里还没有上传任何文档，先让管理员上传资料再提问哦",
             "sources": []
         }
-
     context = "\n---\n".join([r["text"] for r in top_results])
     prompt = f"""你是校园资料助手，必须严格根据下面给出的文档片段回答学生问题，
     如果文档里没有相关内容，就直接说"根据现有资料暂时找不到相关信息"，绝对不允许编造内容。
@@ -257,12 +263,10 @@ def ask_question(question: str, db: Session = Depends(get_db)):
     
     学生问题：{question}
     请用简洁通顺的中文回答："""
-
     try:
         ai_answer = chat_with_llm(prompt)
     except Exception as e:
         return {"error": f"本地大模型连接失败，请确认Ollama后台已启动: {str(e)}", "sources": []}
-
     sources = []
     seen_doc_ids = set()
     for item in top_results:
@@ -275,7 +279,6 @@ def ask_question(question: str, db: Session = Depends(get_db)):
                     "doc_name": doc.filename,
                     "relevance_score": round(item["score"], 3)
                 })
-
     return {
         "answer": ai_answer,
         "sources": sources
