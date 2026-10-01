@@ -145,6 +145,28 @@ def delete_document(
     logger.info(f"管理员成功删除文档 id:{doc_id}，原文件名：{doc_info.filename}")
     return {"msg": f"文档 {doc_id} 已经删除成功"}
 
+# ========== 管理员：修正文档分类 ==========
+@app.put("/admin/documents/{doc_id}/category", summary="【管理员专用】人工修正文档分类")
+def update_doc_category(
+    doc_id: int,
+    new_category: str,
+    admin_secret: str = Query(..., description="管理员操作密钥"),
+    db: Session = Depends(get_db)
+):
+    if admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="权限不足，不是管理员")
+    doc = get_document_by_id(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    allowed_cats = ["培养方案", "考试通知", "课件资料", "行政通知", "社团文件", "未分类"]
+    if new_category not in allowed_cats:
+        raise HTTPException(status_code=400, detail="分类名不合法，可选分类：" + "/".join(allowed_cats))
+    doc.category = new_category
+    doc.category_confirmed = 1  # 标记为人工校准过
+    db.commit()
+    logger.info(f"管理员修正文档id:{doc_id}分类为：{new_category}")
+    return {"msg": f"分类已更新为：{new_category}", "doc_id": doc_id, "category": new_category}
+
 # ========== 管理员：查看全部文档索引列表 ==========
 @app.get("/admin/documents", summary="【管理员专用】查看全部文档索引")
 def admin_get_all_docs(
