@@ -41,10 +41,19 @@ def startup():
 def read_root():
     return {"msg": "校园资料AI检索助手启动成功"}
 
-# ========== 文档上传接口 ==========
-@app.post("/upload/", summary="上传文档")
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+# ========== 文档上传接口（管理员专用） ==========
+@app.post("/upload/", summary="【管理员专用】上传文档")
+async def upload_document(
+    file: UploadFile = File(...),
+    admin_secret: str = Query(..., description="管理员操作密钥"),
+    db: Session = Depends(get_db)
+):
     """上传PDF或Word文档，自动提取文字存入数据库，自动分类"""
+    # 校验管理员密钥
+    if admin_secret != ADMIN_SECRET:
+        logger.warning(f"非管理员尝试上传文档，密钥错误")
+        raise HTTPException(status_code=403, detail="权限不足，只有管理员才能上传文档")
+
     ext = file.filename.lower().split(".")[-1]
     if ext == "pdf":
         filetype = "pdf"
@@ -85,7 +94,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         "category": doc.category
     }
 
-# ========== 文档列表接口 ==========
+# ========== 文档列表接口（学生可访问） ==========
 @app.get("/documents/", summary="获取全部文档列表")
 def get_documents(db: Session = Depends(get_db)):
     docs = list_documents(db)
@@ -162,7 +171,7 @@ def update_doc_category(
     if new_category not in allowed_cats:
         raise HTTPException(status_code=400, detail="分类名不合法，可选分类：" + "/".join(allowed_cats))
     doc.category = new_category
-    doc.category_confirmed = 1  # 标记为人工校准过
+    doc.category_confirmed = 1
     db.commit()
     logger.info(f"管理员修正文档id:{doc_id}分类为：{new_category}")
     return {"msg": f"分类已更新为：{new_category}", "doc_id": doc_id, "category": new_category}
@@ -190,7 +199,7 @@ def admin_get_all_docs(
     logger.info(f"管理员查看全部文档，共{len(result)}条记录")
     return result
 
-# ========== RAG智能问答接口（本地大模型+溯源标注） ==========
+# ========== RAG智能问答接口（学生可访问） ==========
 @app.post("/ask/", summary="RAG智能问答（本地大模型生成回答）")
 def ask_question(question: str, db: Session = Depends(get_db)):
     if not question.strip():
