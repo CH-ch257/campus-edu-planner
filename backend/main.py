@@ -5,286 +5,165 @@ import os
 import uuid
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import (
     init_db, get_db, save_document, list_documents,
-    search_documents, get_document_by_id,
+    get_document_by_id,
     extract_text_from_pdf, extract_text_from_word, extract_text_from_txt,
     UPLOAD_DIR, Document
 )
 from rag import save_chunks_to_db, search_top3_chunks
 from llm import chat_with_llm, classify_document
 
-
-# ---------------------- 日志配置 ----------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-# 管理员密钥
 ADMIN_SECRET = "admin123456"
 
-app = FastAPI(
-    title="校园资料AI检索助手",
-    description="上传PDF/Word/TXT校园资料，自动提取文本，支持文档检索与AI问答",
-    version="1.0.0"
-)
-
+app = FastAPI(title="校园资料AI检索助手", version="1.0.0")
 from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# 启动时建表
 @app.on_event("startup")
 def startup():
     init_db()
 
-@app.get("/", summary="首页根路径")
+@app.get("/", summary="前端首页")
 def read_root():
-    return {"msg": "校园资料AI检索助手启动成功"}
+    return FileResponse("index.html")
 
-# ========== 文档上传接口（管理员专用） ==========
 @app.post("/upload/", summary="【管理员专用】上传文档")
 async def upload_document(
     file: UploadFile = File(...),
-    admin_secret: str = Query(..., description="管理员操作密钥"),
-    db: Session = Depends(get_db)
-):
-    if admin_secret != ADMIN_SECRET:
-        logger.warning(f"非管理员尝试上传文档，密钥错误")
-        raise HTTPException(status_code=403, detail="权限不足，只有管理员才能上传文档")
-
-    ext = file.filename.lower().split(".")[-1]
-    if ext == "pdf":
-        filetype = "pdf"
-    elif ext in ["doc", "docx"]:
-        filetype = "word"
-    elif ext == "txt":
-        filetype = "txt"
-    else:
-        return {"error": "只支持PDF、Word和TXT文档"}
-
-    safe_name = str(uuid.uuid4()) + "." + ext
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
-    if filetype == "pdf":
-        content = extract_text_from_pdf(file_path)
-    elif filetype == "word":
-        content = extract_text_from_word(file_path)
-    else:
-        content = extract_text_from_txt(file_path)
-
-    doc = save_document(db, file.filename, filetype, file_path, content)
-
-    old_latest = db.query(Document).filter(
-        Document.filename == file.filename,
-        Document.is_latest == 1
-    ).first()
-    if old_latest:
-        old_latest.is_latest = 0
-        doc.version = old_latest.version + 1
-        doc.parent_doc_id = old_latest.id
-        logger.info(f"检测到同名旧文档，升级版本号至v{doc.version}")
-    db.commit()
-
-    if doc.content and len(doc.content.strip()) > 0:
-        save_chunks_to_db("./campus.db", doc.id, doc.content)
-        try:
-            auto_cat = classify_document(doc.content)
-            doc.category = auto_cat
-            db.commit()
-            logger.info(f"文档《{doc.filename}》自动分类结果：{auto_cat}")
-        except Exception as e:
-            logger.warning(f"自动分类失败，默认归为未分类：{str(e)}")
-
-    return {
-        "msg": "上传成功",
-        "doc_id": doc.id,
-        "filename": doc.filename,
-        "version": doc.version,
-        "content_length": len(content),
-        "preview": content[:200] + "..." if len(content) > 200 else content,
-        "category": doc.category
-    }
-
-# ========== 文档列表接口（学生只看最新版） ==========
-@app.get("/documents/", summary="获取全部最新文档列表")
-def get_documents(db: Session = Depends(get_db)):
-    docs = db.query(Document).filter(Document.is_latest == 1).order_by(Document.uploaded_at.desc()).all()
-    return [
-        {
-            "id": d.id,
-            "filename": d.filename,
-            "filetype": d.filetype,
-            "category": d.category,
-            "version": d.version,
-            "uploaded_at": d.uploaded_at.isoformat(),
-            "content_length": len(d.content) if d.content else 0
-        }
-        for d in docs
-    ]
-
-@app.get("/documents/search/", summary="按文件名搜索文档")
-def search_docs(keyword: str, db: Session = Depends(get_db)):
-    docs = db.query(Document).filter(Document.filename.contains(keyword), Document.is_latest == 1).all()
-    return [{"id": d.id, "filename": d.filename, "filetype": d.filetype, "category": d.category, "version": d.version} for d in docs]
-
-@app.get("/documents/{doc_id}", summary="查看文档详情")
-def get_doc_detail(doc_id: int, db: Session = Depends(get_db)):
-    doc = get_document_by_id(db, doc_id)
-    if not doc:
-        return {"error": "文档不存在"}
-    return {
-        "id": doc.id,
-        "filename": doc.filename,
-        "filetype": doc.filetype,
-        "category": doc.category,
-        "version": doc.version,
-        "uploaded_at": doc.uploaded_at.isoformat(),
-        "content": doc.content
-    }
-
-# ---------------------- 管理员删除文档接口 ----------------------
-@app.delete("/documents/{doc_id}", summary="【管理员专用】删除文档")
-def delete_document(
-    doc_id: int,
-    admin_secret: str = Query(..., description="管理员操作密钥"),
-    db: Session = Depends(get_db)
-):
-    if admin_secret != ADMIN_SECRET:
-        logger.warning(f"有人尝试删除文档id:{doc_id}，密钥错误，权限拒绝")
-        raise HTTPException(status_code=403, detail="权限不足，不是管理员")
-    doc_info = get_document_by_id(db, doc_id)
-    if not doc_info:
-        logger.info(f"管理员尝试删除文档id:{doc_id}，文档不存在")
-        raise HTTPException(status_code=404, detail="找不到该文档")
-    if os.path.exists(doc_info.file_path):
-        os.remove(doc_info.file_path)
-        logger.info(f"删除本地文件成功：{doc_info.file_path}")
-    db.delete(doc_info)
-    db.commit()
-    logger.info(f"管理员成功删除文档 id:{doc_id}，原文件名：{doc_info.filename}")
-    return {"msg": f"文档 {doc_id} 已经删除成功"}
-
-# ========== 管理员：修正文档分类 ==========
-@app.put("/admin/documents/{doc_id}/category", summary="【管理员专用】人工修正文档分类")
-def update_doc_category(
-    doc_id: int,
-    new_category: str,
-    admin_secret: str = Query(..., description="管理员操作密钥"),
-    db: Session = Depends(get_db)
-):
-    if admin_secret != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="权限不足，不是管理员")
-    doc = get_document_by_id(db, doc_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    allowed_cats = ["培养方案", "考试通知", "课件资料", "行政通知", "社团文件", "未分类"]
-    if new_category not in allowed_cats:
-        raise HTTPException(status_code=400, detail="分类名不合法，可选分类：" + "/".join(allowed_cats))
-    doc.category = new_category
-    doc.category_confirmed = 1
-    db.commit()
-    logger.info(f"管理员修正文档id:{doc_id}分类为：{new_category}")
-    return {"msg": f"分类已更新为：{new_category}", "doc_id": doc_id, "category": new_category}
-
-# ========== 管理员：查看全部文档索引列表 ==========
-@app.get("/admin/documents", summary="【管理员专用】查看全部文档索引")
-def admin_get_all_docs(
-    admin_secret: str = Query(..., description="管理员操作密钥"),
-    db: Session = Depends(get_db)
-):
-    if admin_secret != ADMIN_SECRET:
-        logger.warning("非法访问管理员文档列表，密钥错误")
-        raise HTTPException(status_code=403, detail="权限不足，不是管理员")
-    all_docs = list_documents(db)
-    result = []
-    for item in all_docs:
-        result.append({
-            "id": item.id,
-            "filename": item.filename,
-            "filetype": item.filetype,
-            "category": item.category,
-            "version": item.version,
-            "is_latest": item.is_latest,
-            "uploaded_at": item.uploaded_at.isoformat() if item.uploaded_at else None
-        })
-    logger.info(f"管理员查看全部文档，共{len(result)}条记录")
-    return result
-
-# ========== 管理员：查看文档历史版本 ==========
-@app.get("/admin/documents/{doc_id}/versions", summary="【管理员专用】查看文档所有历史版本")
-def get_doc_versions(
-    doc_id: int,
-    admin_secret: str = Query(..., description="管理员操作密钥"),
+    admin_secret: str = Query(...),
+    confirm: str = Query(None, description="存在同名文档时传yes确认覆盖升级"),
     db: Session = Depends(get_db)
 ):
     if admin_secret != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="权限不足")
-    all_versions = []
-    current_doc = get_document_by_id(db, doc_id)
-    while current_doc:
-        all_versions.append({
-            "id": current_doc.id,
-            "filename": current_doc.filename,
-            "version": current_doc.version,
-            "is_latest": current_doc.is_latest,
-            "uploaded_at": current_doc.uploaded_at.isoformat()
-        })
-        current_doc = get_document_by_id(db, current_doc.parent_doc_id) if current_doc.parent_doc_id else None
-    return all_versions
+    ext = file.filename.lower().split(".")[-1]
+    if ext == "pdf": filetype = "pdf"
+    elif ext in ["doc","docx"]: filetype = "word"
+    elif ext == "txt": filetype = "txt"
+    else: return {"error": "只支持PDF/Word/TXT"}
+    # 先检查是否存在同名最新版（写文件之前检查，避免残留孤儿文件）
+    old = db.query(Document).filter(Document.filename==file.filename, Document.is_latest==1).first()
+    if old and confirm != "yes":
+        return {"need_confirm": True, "current_version": old.version, "msg": "存在同名文档，请确认是否覆盖升级"}
+    safe_name = str(uuid.uuid4()) + "." + ext
+    file_path = os.path.join(UPLOAD_DIR, safe_name)
+    with open(file_path, "wb") as f: f.write(await file.read())
+    if filetype == "pdf": content = extract_text_from_pdf(file_path)
+    elif filetype == "word": content = extract_text_from_word(file_path)
+    else: content = extract_text_from_txt(file_path)
+    # 必须先查同名最新版本（在保存新文档之前查，否则会查到刚插入的自己，导致第一次上传就变v2）
+    old = db.query(Document).filter(Document.filename==file.filename, Document.is_latest==1).first()
+    doc = save_document(db, file.filename, filetype, file_path, content)
+    if old:
+        old.is_latest = 0
+        doc.version = old.version + 1
+        doc.parent_doc_id = old.id
+    doc.is_latest = 1
+    db.commit()
+    if doc.content.strip():
+        save_chunks_to_db("./campus.db", doc.id, doc.content)
+        try:
+            doc.category = classify_document(doc.content)
+            db.commit()
+        except: pass
+    return {"msg":"上传成功", "filename":doc.filename, "version":doc.version, "category":doc.category}
 
-# ========== RAG智能问答接口（学生可访问） ==========
-@app.post("/ask/", summary="RAG智能问答（本地大模型生成回答）")
-def ask_question(question: str, db: Session = Depends(get_db)):
-    if not question.strip():
-        return {"error": "问题不能为空"}
-    top_results = search_top3_chunks("./campus.db", question)
-    if not top_results:
-        return {
-            "answer": "系统里还没有上传任何文档，先让管理员上传资料再提问哦",
-            "sources": []
-        }
-    context = "\n---\n".join([r["text"] for r in top_results])
-    prompt = f"""你是校园资料助手，必须严格根据下面给出的文档片段回答学生问题，
-    如果文档里没有相关内容，就直接说"根据现有资料暂时找不到相关信息"，绝对不允许编造内容。
-    
-    参考文档片段：
-    {context}
-    
-    学生问题：{question}
-    请用简洁通顺的中文回答："""
-    try:
-        ai_answer = chat_with_llm(prompt)
-    except Exception as e:
-        return {"error": f"本地大模型连接失败，请确认Ollama后台已启动: {str(e)}", "sources": []}
-    sources = []
-    seen_doc_ids = set()
-    for item in top_results:
-        if item["doc_id"] not in seen_doc_ids:
-            seen_doc_ids.add(item["doc_id"])
-            doc = get_document_by_id(db, item["doc_id"])
-            if doc:
-                sources.append({
-                    "doc_id": doc.id,
-                    "doc_name": doc.filename,
-                    "relevance_score": round(item["score"], 3)
-                })
-    return {
-        "answer": ai_answer,
-        "sources": sources
+@app.get("/documents/")
+def get_docs(db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.is_latest==1).order_by(Document.uploaded_at.desc()).all()
+    return [{"id":d.id, "filename":d.filename, "category":d.category, "version":d.version} for d in docs]
+
+@app.get("/documents/search/")
+def search_docs(keyword: str, db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.filename.contains(keyword), Document.is_latest==1).all()
+    return [{"id":d.id, "filename":d.filename, "category":d.category, "version":d.version} for d in docs]
+
+@app.get("/documents/{doc_id}")
+def get_doc_detail(doc_id:int, db:Session=Depends(get_db)):
+    doc = get_document_by_id(db, doc_id)
+    if not doc: raise HTTPException(404, "文档不存在")
+    return {"id":doc.id, "filename":doc.filename, "category":doc.category, "version":doc.version, "content":doc.content}
+
+@app.get("/file/{doc_id}", summary="查看/下载原始文件")
+def get_file(doc_id:int, db:Session=Depends(get_db)):
+    doc = get_document_by_id(db, doc_id)
+    if not doc: raise HTTPException(404, "文档不存在")
+    if not os.path.exists(doc.file_path): raise HTTPException(404, "原文件已丢失")
+    # 按类型返回正确MIME：PDF浏览器直接预览，TXT直接显示，Word可下载后用Word打开
+    media_map = {
+        "pdf": "application/pdf",
+        "word": "application/msword",
+        "txt": "text/plain; charset=utf-8"
     }
+    return FileResponse(doc.file_path, filename=doc.filename, media_type=media_map.get(doc.filetype, "application/octet-stream"))
 
-# 启动入口
+@app.delete("/documents/{doc_id}")
+def del_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
+    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+    doc = get_document_by_id(db, doc_id)
+    if not doc: raise HTTPException(404, "文档不存在")
+    if os.path.exists(doc.file_path): os.remove(doc.file_path)
+    db.delete(doc); db.commit()
+    return {"msg":"删除成功"}
+
+@app.put("/admin/documents/{doc_id}/category")
+def fix_cat(doc_id:int, new_category:str, admin_secret:str=Query(...), db:Session=Depends(get_db)):
+    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+    doc = get_document_by_id(db, doc_id)
+    doc.category = new_category
+    db.commit()
+    return {"msg":"分类已更新"}
+
+@app.get("/admin/documents/{doc_id}/versions")
+def get_versions(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
+    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+    res = []
+    seen = set()
+    cur = get_document_by_id(db, doc_id)
+    while cur and cur.id not in seen:
+        seen.add(cur.id)
+        res.append({"id":cur.id, "filename":cur.filename, "version":cur.version, "is_latest":cur.is_latest})
+        cur = get_document_by_id(db, cur.parent_doc_id) if cur.parent_doc_id else None
+    return res
+
+@app.post("/admin/documents/{doc_id}/rollback", summary="【管理员专用】回滚到指定历史版本")
+def rollback_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
+    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+    target = get_document_by_id(db, doc_id)
+    if not target: raise HTTPException(404, "文档不存在")
+    # 把同文件名下当前的最新版标记为历史版
+    latest = db.query(Document).filter(Document.filename==target.filename, Document.is_latest==1).first()
+    if latest and latest.id != target.id:
+        latest.is_latest = 0
+        logger.info(f"回滚：旧最新版v{latest.version}已标记为历史版")
+    target.is_latest = 1
+    db.commit()
+    logger.info(f"管理员已将文档《{target.filename}》回滚到v{target.version}")
+    return {"msg": f"已回滚到 v{target.version}", "filename": target.filename, "version": target.version}
+
+@app.post("/ask/")
+def ask(q:str, db:Session=Depends(get_db)):
+    top = search_top3_chunks("./campus.db", q)
+    if not top: return {"answer":"暂无相关文档", "sources":[]}
+    context = "\n".join([i["text"] for i in top])
+    try:
+        ans = chat_with_llm(f"根据文档片段回答：{context}\n问题：{q}")
+    except:
+        ans = f"[大模型临时无响应] 检索内容：{context[:500]}"
+    srcs = []
+    seen = set()
+    for i in top:
+        if i["doc_id"] not in seen:
+            seen.add(i["doc_id"])
+            d = get_document_by_id(db, i["doc_id"])
+            if d: srcs.append({"doc_name":d.filename})
+    return {"answer":ans, "sources":srcs}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
