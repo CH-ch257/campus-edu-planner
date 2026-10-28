@@ -22,17 +22,24 @@ def chat_with_llm(prompt: str) -> str:
 def classify_document(doc_content: str) -> str:
     """自动给上传的文档分类"""
     preview = doc_content[:500]
-    prompt = f"""你是校园文档分类助手，把下面这份文档分到以下5类中的一类：
-    可选分类：培养方案、考试通知、课件资料、行政通知、社团文件
+    prompt = f"""你是校园文档分类助手，把下面这份文档分到以下6类中的一类：
+    可选分类：培养方案、考试通知、课件资料、行政通知、社团文件、作业
+    作业指学生提交的实验报告、课程作业、用例规约等；课件资料指老师上课用的PPT、讲义、教案。
     只返回分类名称。
     文档内容：{preview}
     分类结果："""
     try:
         result = chat_with_llm(prompt).strip()
-        allowed_cats = ["培养方案", "考试通知", "课件资料", "行政通知", "社团文件"]
+        # 优先精确匹配
+        allowed_cats = ["培养方案", "考试通知", "课件资料", "行政通知", "社团文件", "作业"]
         for cat in allowed_cats:
             if cat in result:
                 return cat
+        # 同义词兜底：模型回答不标准时也能归类
+        if any(k in result for k in ["实验", "作业", "用例", "报告"]):
+            return "作业"
+        if any(k in result for k in ["课件", "讲义", "教案", "PPT", "ppt"]):
+            return "课件资料"
     except:
         pass
     return "未分类"
