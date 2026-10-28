@@ -11,7 +11,7 @@ def chat_with_llm(prompt: str) -> str:
     """调用本地千问模型生成回答"""
     try:
         response = client.chat.completions.create(
-            model="qwen2:1.5b",
+            model="qwen2.5:3b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
