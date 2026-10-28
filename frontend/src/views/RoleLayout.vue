@@ -54,20 +54,33 @@ function logout() {
 </template>
 
 <style scoped>
-.app-shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg, #f3f5fb); }
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
-  height: 64px; position: sticky; top: 0; z-index: 100;
+  height: 66px; position: sticky; top: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px; background: rgba(255,255,255,.85);
-  backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid #e7ebf3;
+  padding: 0 26px;
+  background: linear-gradient(120deg, #0c4a6e 0%, #0ea5e9 55%, #10b981 130%);
+  box-shadow: 0 4px 20px rgba(12, 74, 110, .25);
 }
-.brand { display: flex; align-items: center; font-weight: 700; font-size: 18px; color: #1e293b; }
-.brand .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 17px; }
-.nav { display: flex; gap: 4px; flex: 1; margin: 0 24px; }
-.nav-link { padding: 6px 14px; border-radius: 8px; color: #475569; text-decoration: none; font-size: 14px; white-space: nowrap; }
-.nav-link.router-link-active { background: #eef2ff; color: #4f46e5; font-weight: 600; }
+.brand { display: flex; align-items: center; font-weight: 700; font-size: 17px; color: #fff; letter-spacing: .5px; text-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.brand .logo {
+  width: 34px; height: 34px; border-radius: 10px; margin-right: 10px;
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35);
+  color: #fff; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; backdrop-filter: blur(4px);
+}
+.nav { display: flex; gap: 6px; flex: 1; margin: 0 24px; }
+.nav-link {
+  padding: 7px 16px; border-radius: 10px; color: rgba(255,255,255,.82);
+  text-decoration: none; font-size: 14px; white-space: nowrap;
+  transition: background .2s ease, color .2s ease;
+}
+.nav-link:hover { background: rgba(255,255,255,.14); color: #fff; }
+.nav-link.router-link-active {
+  background: rgba(255,255,255,.22); color: #fff; font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+}
 .actions { display: flex; align-items: center; gap: 8px; }
 .me { margin-right: 2px; }
-.main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+.main { flex: 1; width: 100%; max-width: 1320px; margin: 0 auto; padding: 26px 24px 40px; }
 </style>

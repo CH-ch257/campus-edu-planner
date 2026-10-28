@@ -77,10 +77,12 @@ onMounted(load)
 </script>
 
 <template>
-  <el-card shadow="never" class="wrap">
+  <el-card shadow="never" class="wrap soft-card">
     <template #header>
       <div class="head">
-        <b>我的问答历史</b>
+        <div class="head-title">
+          <span class="head-dot"></span>我的问答历史
+        </div>
         <div class="search">
           <el-input v-model="keyword" placeholder="搜索问题或回答..." clearable @keyup.enter="search" @clear="search" />
           <el-button type="primary" @click="search">搜索</el-button>
@@ -88,16 +90,16 @@ onMounted(load)
       </div>
     </template>
 
-    <div v-if="loading" class="empty">加载中…</div>
-    <div v-else-if="!list.length" class="empty">暂无问答记录，去「AI 问答」提问吧</div>
+    <div v-if="loading" class="empty-tip">加载中…</div>
+    <div v-else-if="!list.length" class="empty-tip">暂无问答记录，去「AI 问答」提问吧</div>
 
     <div v-for="r in list" :key="r.id" class="qa-item">
-      <div class="q">{{ r.question }}</div>
-      <div class="a">{{ r.answer }}</div>
+      <div class="q"><span class="q-mark">Q</span>{{ r.question }}</div>
+      <div class="a"><span class="a-mark">A</span>{{ r.answer }}</div>
       <div v-if="r.sources && r.sources.length" class="src">
-        参考：{{ r.sources.map(s => s.doc_name).join('、') }}
+        📎 参考：{{ r.sources.map(s => s.doc_name).join('、') }}
       </div>
-      <div v-if="r.note" class="note">备注：{{ r.note }}</div>
+      <div v-if="r.note" class="note">📝 {{ r.note }}</div>
       <div class="meta">
         <span class="time">{{ r.created_at }}</span>
         <el-tag size="small" :type="permMap[r.permission]?.type || 'info'">{{ permMap[r.permission]?.label }}</el-tag>
@@ -116,16 +118,28 @@ onMounted(load)
 </template>
 
 <style scoped>
-.wrap { border-radius: 16px; border: 1px solid #e7ebf3; }
 .head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.head-title { display: flex; align-items: center; font-weight: 700; }
+.head-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #0ea5e9, #10b981); margin-right: 10px; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
 .search { display: flex; gap: 8px; width: 320px; }
-.empty { color: #94a3b8; text-align: center; padding: 40px 0; font-size: 14px; }
-.qa-item { padding: 14px; border: 1px solid #eef2f7; border-radius: 12px; margin-bottom: 12px; }
-.q { font-weight: 600; color: #1e293b; margin-bottom: 6px; }
-.a { color: #475569; line-height: 1.7; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
-.src { font-size: 12px; color: #64748b; margin-top: 8px; padding: 5px 10px; background: #eef2ff; border-radius: 8px; }
-.note { font-size: 13px; color: #b45309; margin-top: 8px; background: #fef3c7; padding: 6px 10px; border-radius: 8px; }
-.meta { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.qa-item {
+  padding: 18px 20px; border: 1px solid #e6f0f8; border-radius: 14px; margin-bottom: 14px;
+  background: #fff; box-shadow: 0 2px 10px rgba(15,118,110,.05);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.qa-item:hover { box-shadow: 0 8px 24px rgba(14,165,233,.12); transform: translateY(-1px); }
+.q { display: flex; align-items: flex-start; font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 15px; }
+.q-mark, .a-mark {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px; margin-right: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+}
+.q-mark { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
+.a-mark { background: linear-gradient(135deg, #10b981, #34d399); }
+.a { color: #475569; line-height: 1.75; white-space: pre-wrap; word-break: break-word; font-size: 14px; padding-left: 32px; }
+.src { font-size: 12px; color: #0369a1; margin-top: 10px; padding: 7px 12px; background: linear-gradient(135deg, #e0f2fe, #ccfbf1); border-radius: 10px; border: 1px solid #bae6fd; }
+.note { font-size: 13px; color: #b45309; margin-top: 10px; background: #fef3c7; padding: 7px 12px; border-radius: 10px; border: 1px solid #fde68a; }
+.meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; padding-top: 10px; border-top: 1px dashed #e6f0f8; }
 .time { font-size: 12px; color: #94a3b8; }
 .ops { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 </style>

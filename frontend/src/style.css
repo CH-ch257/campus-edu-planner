@@ -1,0 +1,86 @@
+/* ===== 全局主题：清新校园风（青蓝→翠绿） ===== */
+:root {
+  /* Element Plus 主色覆盖 */
+  --el-color-primary: #0ea5e9;
+  --el-color-primary-light-3: #38bdf8;
+  --el-color-primary-light-5: #7dd3fc;
+  --el-color-primary-light-7: #bae6fd;
+  --el-color-primary-light-8: #e0f2fe;
+  --el-color-primary-light-9: #f0f9ff;
+  --el-color-primary-dark-2: #0284c7;
+
+  /* 品牌渐变 */
+  --brand-from: #0ea5e9;
+  --brand-to: #10b981;
+  --brand-grad: linear-gradient(135deg, #0ea5e9, #10b981);
+
+  /* 页面背景 */
+  --bg-page: linear-gradient(160deg, #f0f9ff 0%, #ecfeff 45%, #f0fdf4 100%);
+  --card-border: #e2ecf5;
+  --shadow-soft: 0 10px 30px rgba(14, 165, 233, .08), 0 2px 8px rgba(15, 118, 110, .06);
+  --shadow-hover: 0 14px 38px rgba(14, 165, 233, .14), 0 4px 12px rgba(15, 118, 110, .08);
+
+  --text-main: #0f172a;
+  --text-sub: #64748b;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  color: var(--text-main);
+}
+
+#app {
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+/* ===== 通用软卡片 ===== */
+.soft-card {
+  border-radius: 18px !important;
+  border: 1px solid var(--card-border) !important;
+  background: rgba(255, 255, 255, .92) !important;
+  box-shadow: var(--shadow-soft) !important;
+  backdrop-filter: blur(8px);
+  transition: box-shadow .25s ease, transform .25s ease;
+}
+.soft-card:hover { box-shadow: var(--shadow-hover) !important; }
+
+/* 卡片头部 */
+.soft-card .el-card__header {
+  border-bottom: 1px solid #eef4f9 !important;
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 15px;
+  background: linear-gradient(180deg, rgba(240, 249, 255, .6), rgba(255, 255, 255, 0));
+}
+
+/* ===== 按钮圆角 ===== */
+.el-button { border-radius: 10px !important; font-weight: 500; }
+.el-button--primary {
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  border: none;
+}
+.el-button--primary:hover {
+  background-image: linear-gradient(135deg, #0d8fd0, #0da56f);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, .3);
+}
+.el-button { transition: transform .15s ease, box-shadow .15s ease; }
+
+/* ===== 输入框 ===== */
+.el-input__wrapper { border-radius: 12px !important; }
+.el-textarea__inner { border-radius: 12px !important; }
+
+/* ===== 标签 ===== */
+.el-tag { border-radius: 8px !important; }
+
+/* ===== 弹窗圆角 ===== */
+.el-dialog { border-radius: 16px !important; }
+.el-message-box { border-radius: 16px !important; }
+
+/* ===== 空状态 ===== */
+.empty-tip {
+  color: #94a3b8; text-align: center; padding: 36px 0; font-size: 13px;
+}

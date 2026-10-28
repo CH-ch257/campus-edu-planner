@@ -55,8 +55,10 @@ onMounted(load)
 <template>
   <el-row :gutter="20">
     <el-col :xs="24" :md="8">
-      <el-card shadow="never" class="wrap">
-        <template #header><b>新增老师账号</b></template>
+      <el-card shadow="never" class="wrap soft-card">
+        <template #header>
+          <div class="card-title"><span class="head-dot"></span>新增老师账号</div>
+        </template>
         <el-form @submit.prevent="createTeacher">
           <el-input v-model="username" placeholder="老师用户名" class="mb" />
           <el-input v-model="password" type="password" placeholder="初始密码（至少4位）" show-password class="mb" />
@@ -66,20 +68,22 @@ onMounted(load)
     </el-col>
 
     <el-col :xs="24" :md="16">
-      <el-card shadow="never" class="wrap">
-        <template #header><b>用户列表</b></template>
-        <el-table :data="list" v-loading="loading" border stripe>
+      <el-card shadow="never" class="wrap soft-card">
+        <template #header>
+          <div class="card-title"><span class="head-dot head-dot-2"></span>用户列表</div>
+        </template>
+        <el-table :data="list" v-loading="loading" class="user-table" :header-cell-style="{ background: '#f0f9ff', color: '#0369a1', fontWeight: 700 }">
           <el-table-column prop="username" label="用户名" />
           <el-table-column label="角色" width="120">
             <template #default="{ row }">
-              <el-tag :type="row.role === 'admin' ? 'danger' : row.role === 'teacher' ? 'warning' : 'primary'" size="small">
+              <el-tag :type="row.role === 'admin' ? 'danger' : row.role === 'teacher' ? 'warning' : 'primary'" size="small" effect="light">
                 {{ roleMap[row.role] }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
+              <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small" effect="light">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="created_at" label="创建时间" min-width="140" />
@@ -89,6 +93,7 @@ onMounted(load)
                 v-if="row.role === 'teacher'"
                 size="small"
                 :type="row.status === 1 ? 'danger' : 'success'"
+                plain
                 @click="toggleStatus(row)"
               >
                 {{ row.status === 1 ? '禁用' : '启用' }}
@@ -102,7 +107,11 @@ onMounted(load)
 </template>
 
 <style scoped>
-.wrap { border-radius: 16px; border: 1px solid #e7ebf3; }
+.card-title { display: flex; align-items: center; font-weight: 700; }
+.head-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #0ea5e9, #10b981); margin-right: 10px; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+.head-dot-2 { background: linear-gradient(135deg, #10b981, #0ea5e9); box-shadow: 0 0 0 3px rgba(16,185,129,.15); }
 .mb { margin-bottom: 14px; }
 .full { width: 100%; }
+.user-table { border-radius: 12px; overflow: hidden; }
+.user-table :deep(.el-table__inner-wrapper) { border-radius: 12px; }
 </style>

@@ -194,16 +194,27 @@ onMounted(loadDocs)
   <el-row :gutter="20">
     <!-- 问答区 -->
     <el-col :xs="24" :md="16">
-      <el-card shadow="never" class="chat-card">
-        <template #header><b>智能问答（学生 / 老师 / 管理员均可使用）</b></template>
+      <el-card shadow="never" class="chat-card soft-card">
+        <template #header>
+          <div class="card-head">
+            <span class="head-dot"></span>智能问答
+            <span class="head-sub">学生 / 老师 / 管理员均可使用</span>
+          </div>
+        </template>
         <div ref="chatBox" class="chat-box">
           <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
-            <div class="bubble">{{ m.content }}</div>
-            <div v-if="m.sources && m.sources.length" class="source-tag">
-              参考：{{ m.sources.map(s => s.doc_name).join('、') }}
+            <div v-if="m.role === 'ai'" class="avatar">✦</div>
+            <div class="msg-body">
+              <div class="bubble">{{ m.content }}</div>
+              <div v-if="m.sources && m.sources.length" class="source-tag">
+                📎 参考：{{ m.sources.map(s => s.doc_name).join('、') }}
+              </div>
             </div>
           </div>
-          <div v-if="asking" class="msg ai"><div class="bubble">思考中…</div></div>
+          <div v-if="asking" class="msg ai">
+            <div class="avatar">✦</div>
+            <div class="msg-body"><div class="bubble typing">思考中<span>.</span><span>.</span><span>.</span></div></div>
+          </div>
         </div>
         <div class="input-bar">
           <el-input
@@ -219,14 +230,16 @@ onMounted(loadDocs)
 
     <!-- 文档库 -->
     <el-col :xs="24" :md="8">
-      <el-card shadow="never" class="doc-card">
-        <template #header><b>文档库 · 按分类浏览</b></template>
+      <el-card shadow="never" class="doc-card soft-card">
+        <template #header>
+          <div class="card-head"><span class="head-dot head-dot-2"></span>文档库 · 按分类浏览</div>
+        </template>
         <el-input v-model="searchKeyword" placeholder="搜索文件名..." clearable @input="searchDocs" />
         <el-button class="sort-btn" @click="toggleSort">
           排序：{{ sortMode === 'time' ? '按上传时间' : '按文件名' }}
         </el-button>
 
-        <div v-if="!docs.length" class="empty">暂无文档</div>
+        <div v-if="!docs.length" class="empty-tip">暂无文档</div>
         <el-collapse v-model="activeNames">
           <el-collapse-item v-for="(list, cat) in groupedDocs" :key="cat" :name="cat">
             <template #title>
@@ -235,13 +248,13 @@ onMounted(loadDocs)
             </template>
             <div v-for="d in list" :key="d.id" class="doc-item">
               <div class="doc-row">
-                <span class="doc-title" @click="viewDoc(d.id)">{{ d.filename }}</span>
-                <el-tag size="small" type="info">v{{ d.version }}</el-tag>
+                <span class="doc-title" @click="viewDoc(d.id)">📄 {{ d.filename }}</span>
+                <el-tag size="small" type="info" effect="plain">v{{ d.version }}</el-tag>
               </div>
               <div v-if="user.isTeacher" class="doc-actions">
                 <el-button size="small" @click="editCat(d.id, d.category)">改分类</el-button>
                 <el-button size="small" @click="showVer(d.id)">历史版本</el-button>
-                <el-button size="small" type="danger" @click="delDoc(d.id)">删除</el-button>
+                <el-button size="small" type="danger" plain @click="delDoc(d.id)">删除</el-button>
               </div>
             </div>
           </el-collapse-item>
@@ -269,38 +282,63 @@ onMounted(loadDocs)
       <el-tag v-if="v.is_latest" type="success" size="small">当前最新版</el-tag>
       <el-button v-if="!v.is_latest" size="small" type="warning" @click="rollback(v.id, v.version)">回滚到此版本</el-button>
     </div>
-    <div v-if="!versions.length" class="empty">没有历史版本</div>
+    <div v-if="!versions.length" class="empty-tip">没有历史版本</div>
   </el-dialog>
 </template>
 
 <style scoped>
-.chat-card, .doc-card { border-radius: 16px; border: 1px solid #e7ebf3; }
+.card-head { display: flex; align-items: center; font-weight: 700; color: #0f172a; }
+.head-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #0ea5e9, #10b981); margin-right: 10px; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
+.head-dot-2 { background: linear-gradient(135deg, #10b981, #0ea5e9); box-shadow: 0 0 0 3px rgba(16,185,129,.15); }
+.head-sub { font-weight: 400; font-size: 12px; color: #94a3b8; margin-left: 10px; }
 .chat-box {
-  height: 480px; overflow-y: auto; background: #f8fafc;
-  border: 1px solid #e7ebf3; border-radius: 14px; padding: 18px;
+  height: 500px; overflow-y: auto;
+  background: linear-gradient(180deg, #f8fdfd 0%, #f6fafd 100%);
+  border: 1px solid #e2ecf5; border-radius: 14px; padding: 18px;
 }
-.msg { display: flex; flex-direction: column; margin-bottom: 14px; max-width: 85%; }
-.msg.user { align-items: flex-end; margin-left: auto; }
+.msg { display: flex; margin-bottom: 16px; max-width: 88%; }
+.msg.user { flex-direction: row-reverse; margin-left: auto; }
 .msg.ai { align-items: flex-start; }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #0ea5e9, #10b981); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  box-shadow: 0 4px 10px rgba(14,165,233,.3); margin: 4px 10px 0 0;
+}
+.msg.user .avatar { margin: 4px 0 0 10px; background: linear-gradient(135deg, #64748b, #475569); box-shadow: 0 4px 10px rgba(71,85,105,.3); }
+.msg-body { display: flex; flex-direction: column; }
 .bubble {
-  border-radius: 16px; padding: 10px 14px; line-height: 1.6; font-size: 14px;
+  border-radius: 16px; padding: 11px 16px; line-height: 1.65; font-size: 14px;
   white-space: pre-wrap; word-break: break-word; max-width: 100%;
 }
-.msg.user .bubble { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-bottom-right-radius: 4px; }
-.msg.ai .bubble { background: #fff; border: 1px solid #e7ebf3; border-bottom-left-radius: 4px; }
-.source-tag { font-size: 12px; color: #64748b; margin-top: 6px; padding: 5px 10px; background: #eef2ff; border-radius: 8px; }
-.input-bar { display: flex; gap: 10px; margin-top: 14px; }
+.msg.user .bubble { background: linear-gradient(135deg, #0ea5e9, #14b8a6); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(14,165,233,.22); }
+.msg.ai .bubble { background: #fff; border: 1px solid #e2ecf5; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(15,118,110,.05); }
+.source-tag {
+  font-size: 12px; color: #0369a1; margin-top: 7px; padding: 6px 12px;
+  background: linear-gradient(135deg, #e0f2fe, #ccfbf1); border-radius: 10px;
+  border: 1px solid #bae6fd; align-self: flex-start;
+}
+.typing span { animation: blink 1.4s infinite; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+.input-bar {
+  display: flex; gap: 10px; margin-top: 16px; padding: 10px;
+  background: rgba(255,255,255,.8); border: 1px solid #e2ecf5; border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15,118,110,.06);
+}
 .input-bar .el-input { flex: 1; }
-.sort-btn { width: 100%; margin: 12px 0; }
-.empty { color: #94a3b8; text-align: center; padding: 20px 0; font-size: 13px; }
-.cat-badge { font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+.input-bar .el-input__wrapper { background: transparent; }
+.sort-btn { width: 100%; margin: 14px 0; }
+.cat-badge { font-size: 12px; padding: 4px 10px; border-radius: 8px; font-weight: 600; }
 .cat-count { color: #94a3b8; font-size: 12px; margin-left: 8px; }
-.doc-item { padding: 10px 4px; border-bottom: 1px solid #f2f4f9; }
+.doc-item { padding: 12px 6px; border-bottom: 1px solid #f2f7fb; transition: background .15s ease; border-radius: 10px; }
+.doc-item:hover { background: #f6fbfe; }
 .doc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.doc-title { cursor: pointer; color: #6366f1; font-weight: 600; font-size: 13px; word-break: break-all; }
-.doc-title:hover { text-decoration: underline; }
+.doc-title { cursor: pointer; color: #0ea5e9; font-weight: 600; font-size: 13px; word-break: break-all; transition: color .15s; }
+.doc-title:hover { color: #0284c7; text-decoration: underline; }
 .doc-actions { display: flex; gap: 6px; margin-top: 8px; }
-.file-input { display: block; margin-bottom: 10px; font-size: 13px; }
+.file-input { display: block; margin-bottom: 10px; font-size: 13px; color: #64748b; }
 .upload-btn { width: 100%; }
 .doc-content { white-space: pre-wrap; max-height: 60vh; overflow-y: auto; background: #f8fafc; padding: 16px; border-radius: 10px; font-size: 13px; }
 .ver-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f2f4f9; }
