@@ -1,34 +1,43 @@
 import { defineStore } from 'pinia'
 
-// 用户登录态（阶段一先做轻量版，账号/角色在阶段二完善）
+// 用户登录态：token + 角色（student / teacher / admin）
 export const useUserStore = defineStore('user', {
   state: () => ({
+    token: localStorage.getItem('token') || '',
     username: localStorage.getItem('username') || '',
     userId: localStorage.getItem('user_id') || '',
-    isAdmin: localStorage.getItem('adminSecret') === 'admin123456'
+    role: localStorage.getItem('role') || ''
   }),
+  getters: {
+    isLoggedIn: (state) => !!state.token,
+    isStudent: (state) => state.role === 'student',
+    isTeacher: (state) => state.role === 'teacher',
+    isAdmin: (state) => state.role === 'admin'
+  },
   actions: {
-    setUser({ username, user_id }) {
+    setAuth({ token, user_id, username, role }) {
+      this.token = token
       this.username = username
       this.userId = String(user_id || '')
+      this.role = role
+      localStorage.setItem('token', token)
       localStorage.setItem('username', username)
       localStorage.setItem('user_id', String(user_id || ''))
-    },
-    setAdmin(v) {
-      this.isAdmin = v
-      if (v) localStorage.setItem('adminSecret', 'admin123456')
-      else localStorage.removeItem('adminSecret')
+      localStorage.setItem('role', role)
     },
     logout() {
+      this.token = ''
       this.username = ''
       this.userId = ''
-      this.isAdmin = false
+      this.role = ''
+      localStorage.removeItem('token')
       localStorage.removeItem('username')
       localStorage.removeItem('user_id')
-      localStorage.removeItem('adminSecret')
+      localStorage.removeItem('role')
     },
+    // 文档管理密钥沿用原有硬编码逻辑，仅高级管理员可用
     adminSecret() {
-      return this.isAdmin ? 'admin123456' : ''
+      return this.role === 'admin' ? 'admin123456' : ''
     }
   }
 })

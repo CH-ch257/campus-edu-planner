@@ -10,12 +10,14 @@ async function request(path, { method = 'GET', params, body, isForm = false } = 
     })
     url += '?' + qs.toString()
   }
-  const options = { method }
+  const options = { method, headers: {} }
+  const token = localStorage.getItem('token')
+  if (token) options.headers['Authorization'] = 'Bearer ' + token
   if (body) {
     if (isForm) {
       options.body = body
     } else {
-      options.headers = { 'Content-Type': 'application/json' }
+      options.headers['Content-Type'] = 'application/json'
       options.body = JSON.stringify(body)
     }
   }
@@ -49,7 +51,8 @@ export const api = {
   ask: (q) => request('/ask/', { method: 'POST', params: { q } }),
   // 用户
   login: (username, password) => request('/login/', { method: 'POST', params: { username, password } }),
-  register: (username, password) => request('/register/', { method: 'POST', params: { username, password } })
+  register: (username, password) => request('/register/', { method: 'POST', params: { username, password } }),
+  me: () => request('/me/')
 }
 
 export function fileUrl(id) {

@@ -5,7 +5,7 @@ import os
 import uuid
 import hashlib
 import logging
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Header
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -63,7 +63,7 @@ def register(username: str = Query(...), password: str = Query(...), db: Session
         raise HTTPException(status_code=400, detail="密码至少4位")
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="用户名已存在")
-    user = User(username=username, password_hash=hash_password(password))
+    user = User(username=username, password_hash=hash_password(password), role="student", status=1)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -75,7 +75,30 @@ def login(username: str = Query(...), password: str = Query(...), db: Session = 
     user = db.query(User).filter(User.username == username.strip()).first()
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=403, detail="用户名或密码错误")
-    return {"msg": "登录成功", "user_id": user.id, "username": user.username}
+    if user.status != 1:
+        raise HTTPException(status_code=403, detail="账号已被禁用")
+    user.token = uuid.uuid4().hex
+    db.commit()
+    return {"msg": "登录成功", "user_id": user.id, "username": user.username, "role": user.role, "token": user.token}
+
+
+def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)):
+    """解析 Authorization: Bearer <token>，返回当前登录用户，未登录/失效返回 401"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="未登录")
+    token = authorization[7:].strip()
+    user = db.query(User).filter(User.token == token).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+    if user.status != 1:
+        raise HTTPException(status_code=403, detail="账号已被禁用")
+    return user
+
+
+@app.get("/me/", summary="获取当前登录用户信息")
+def me(current_user: User = Depends(get_current_user)):
+    return {"user_id": current_user.id, "username": current_user.username, "role": current_user.role}
+
 
 @app.post("/upload/", summary="【管理员专用】上传文档")
 async def upload_document(

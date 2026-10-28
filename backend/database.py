@@ -4,8 +4,10 @@
 """
 
 import os
+import uuid
+import hashlib
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -55,13 +57,42 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True, comment="用户名")
     password_hash = Column(String(128), nullable=False, comment="加盐哈希后的密码")
+    role = Column(String(20), default="student", comment="角色：student/teacher/admin")
+    status = Column(Integer, default=1, comment="账号状态：1=启用 0=禁用")
+    token = Column(String(64), nullable=True, comment="登录token")
     created_at = Column(DateTime, default=datetime.now, comment="注册时间")
 
 # ========== 建表 ==========
 
+def hash_password(password: str) -> str:
+    """对密码加盐做SHA256哈希（与 main.py 保持一致）"""
+    salt = uuid.uuid4().hex
+    digest = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"{salt}:{digest}"
+
+
 def init_db():
-    """初始化数据库，创建表"""
+    """初始化数据库，创建表，并做轻量迁移与预设固定账号"""
     Base.metadata.create_all(bind=engine)
+    # 轻量迁移：为阶段一已有的 users 表补充新列（create_all 不会改已有表）
+    with engine.begin() as conn:
+        cols = [r[1] for r in conn.execute(text("PRAGMA table_info(users)"))]
+        if "role" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'student'"))
+        if "status" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN status INTEGER DEFAULT 1"))
+        if "token" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN token VARCHAR(64)"))
+    # 预设固定账号：高级管理员 admin、老师 teacher（仅当不存在时创建，不开放注册）
+    db = SessionLocal()
+    try:
+        if not db.query(User).filter(User.username == "admin").first():
+            db.add(User(username="admin", password_hash=hash_password("admin123"), role="admin", status=1))
+        if not db.query(User).filter(User.username == "teacher").first():
+            db.add(User(username="teacher", password_hash=hash_password("teacher123"), role="teacher", status=1))
+        db.commit()
+    finally:
+        db.close()
     print("✅ 数据库初始化完成")
 
 def get_db():
