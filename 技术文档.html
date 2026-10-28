@@ -4,35 +4,66 @@
     <meta charset="UTF-8">
     <title>校园资料AI检索助手 技术文档</title>
     <style>
-        body { font-family: "Microsoft YaHei", sans-serif; max-width: 900px; margin: 0 auto; padding: 60px; line-height: 2.5; font-size: 16px; }
-        h1 { text-align: center; font-size: 32px; margin-bottom: 60px; }
-        h2 { font-size: 24px; margin-top: 60px; border-bottom: 2px solid #333; padding-bottom: 10px; page-break-after: avoid; }
-        h3 { font-size: 20px; margin-top: 30px; page-break-after: avoid; }
+        body { font-family: "Microsoft YaHei", sans-serif; max-width: 900px; margin: 0 auto; padding: 50px; line-height: 2.3; font-size: 15.5px; }
+        h1 { text-align: center; font-size: 30px; margin-bottom: 45px; }
+        h2 { font-size: 22px; margin-top: 45px; border-bottom: 2px solid #333; padding-bottom: 9px; page-break-after: avoid; }
+        h3 { font-size: 19px; margin-top: 25px; page-break-after: avoid; }
         .arch-diagram { background: #f5f7fb; padding: 30px; border-radius: 8px; margin: 20px 0; text-align: center; }
         .layer { background: #0d6efd; color: white; padding: 12px; margin: 8px 0; border-radius: 6px; }
-        .screenshot-placeholder { border: 2px dashed #ccc; padding: 60px; text-align: center; color: #999; margin: 20px 0; border-radius: 8px; }
+        .screenshot-placeholder { border: 2px dashed #ccc; padding: 60px; text-align: center; color: #999; margin: 20px 0; border-radius: 8px; page-break-inside: avoid; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f0f7ff; }
         .bug-card { background: #fff8e6; padding: 25px; border-radius: 8px; margin: 25px 0; page-break-inside: avoid; }
         table th, table td { padding: 15px; }
+        pre { background: #f6f8fa; border: 1px solid #ddd; border-radius: 6px; padding: 15px; overflow-x: auto; font-size: 14px; line-height: 1.6; page-break-inside: avoid; }
+        code { font-family: Consolas, "Courier New", monospace; }
+        .note { background: #e8f4fd; padding: 12px 20px; border-radius: 6px; margin: 15px 0; }
+        .api-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; page-break-inside: avoid; }
+        .api-card h4 { margin-top: 0; }
+        .tag { display: inline-block; background: #0d6efd; color: white; padding: 2px 10px; border-radius: 4px; font-size: 13px; margin-right: 8px; }
+        .tag.green { background: #198754; }
     </style>
 </head>
 <body>
     <h1>校园资料AI检索助手 技术文档</h1>
 
     <h2>1. 项目概述</h2>
-    <p>本项目是面向校园场景的本地化智能资料检索系统，解决传统校园文档分散、查找困难、版本混乱的实际痛点。系统基于RAG（检索增强生成）架构，全程使用本地开源模型，无需调用外部付费API，保障学生课件、培养方案等敏感校园数据不出校。</p>
-    <h3>核心功能列表</h3>
+    <h3>1.1 项目背景</h3>
+    <p>在校园日常学习与办公中，课程课件、培养方案、考试通知、实验报告等资料散落在班级群、个人U盘、网盘等各处，存在以下典型痛点：</p>
+    <table>
+        <tr><th>痛点</th><th>具体表现</th><th>传统解决方式的局限</th></tr>
+        <tr><td>资料分散</td><td>同一门课的课件可能分布在多个群文件、多个同学的U盘中</td><td>每次找资料需要翻多个渠道，效率极低</td></tr>
+        <tr><td>查找困难</td><td>只能靠"文件名记忆"去找，记不清文件名就找不到</td><td>没有内容级检索能力，无法按语义搜索</td></tr>
+        <tr><td>版本混乱</td><td>同一份培养方案被反复修改，群里同时存在多个版本</td><td>无法区分新旧版本，容易用错过期文件</td></tr>
+        <tr><td>信息无法问答</td><td>培养方案里的学分要求、考试通知里的细则需要人肉翻阅</td><td>文档只能"看"，不能"问"</td></tr>
+    </table>
+    <p>本项目正是针对上述痛点，构建一套<b>本地化部署的校园资料智能检索系统</b>：把校园文档统一托管、自动分类、语义检索，并基于RAG（检索增强生成）架构实现"带来源标注的智能问答"，全程使用本地开源模型，无需调用外部付费API，保障学生课件、培养方案等敏感校园数据不出校。</p>
+
+    <h3>1.2 核心功能列表</h3>
     <ul>
-        <li>多格式文档上传：支持PDF、Word、TXT格式，自动提取文本内容</li>
+        <li>多格式文档上传：支持PDF、Word、TXT格式，自动提取文本内容并入库</li>
         <li>AI自动文档分类：自动按校园场景归类，支持管理员人工修正</li>
         <li>带溯源标注的智能问答：回答自动标注参考来源文档，防幻觉</li>
         <li>两级权限隔离：学生可自由查询问答，管理员密钥才能上传/修改文档</li>
-        <li>文档版本管理：同名文档自动保留历史版本，优先展示最新版</li>
+        <li>文档版本管理：同名文档自动保留历史版本，优先展示最新版，支持一键回滚</li>
+        <li>分类折叠展示：文档库按分类折叠，界面简洁清晰</li>
+        <li>原文件查看：详情支持打开/下载原始文件，保留原始格式</li>
     </ul>
 
+    <h3>1.3 技术选型与依据</h3>
+    <table>
+        <tr><th>层级</th><th>技术组件</th><th>选型依据</th></tr>
+        <tr><td>后端框架</td><td>FastAPI + Uvicorn</td><td>轻量、性能高、自带接口文档（/docs），适合本地部署</td></tr>
+        <tr><td>数据库</td><td>SQLite（SQLAlchemy ORM）</td><td>零配置、单文件、免部署，满足轻量场景</td></tr>
+        <tr><td>向量编码</td><td>BAAI/bge-small-zh-v1.5</td><td>中文语义效果好、模型小（约90MB）、CPU可实时推理</td></tr>
+        <tr><td>大模型</td><td>Ollama 部署 Qwen2:1.5B</td><td>本地运行、数据不出校、1.5B参数在CPU上可运行</td></tr>
+        <tr><td>前端</td><td>Bootstrap 5 单页应用</td><td>无构建工具链，单文件可直接托管，部署简单</td></tr>
+        <tr><td>文本解析</td><td>PyMuPDF / python-docx</td><td>分别解析PDF与Word文档，纯本地处理</td></tr>
+    </table>
+
     <h2>2. 系统架构设计</h2>
+    <h3>2.1 总体架构</h3>
     <p>系统采用轻量前后端分离架构，无重型依赖，部署简单：</p>
     <div class="arch-diagram">
         <div class="layer">前端展示层：Bootstrap 单页界面（学生/管理员双视角）</div>
@@ -46,23 +77,31 @@
             <br>大模型生成：Ollama 部署 Qwen2:1.5b
         </div>
     </div>
-    <h3>核心数据流程</h3>
-    <p>用户上传文档 → 自动提取文本 → 按语义分块 → 向量编码入库<br>
-    用户提问 → 问题向量化 → Top3相似度检索匹配 → 拼接上下文Prompt → 本地大模型生成回答 → 标注参考来源返回用户</p>
+
+    <h3>2.2 核心数据流程</h3>
+    <p><b>入库链路：</b></p>
+    <pre><code>用户上传文档 → 按类型提取文本(PDF/Word/TXT) → 按语义分块(每块约300字)
+→ 向量编码(bge-small-zh) → 写入chunks表 → 调用大模型自动分类 → 写入documents表</code></pre>
+    <p><b>问答链路：</b></p>
+    <pre><code>用户提问 → 问题向量化 → 余弦相似度检索Top3文本块
+→ 拼接上下文Prompt → 本地大模型生成回答 → 标注参考来源返回用户</code></pre>
+    <p><b>版本管理链路：</b></p>
+    <pre><code>上传同名文档 → 检测同名最新版 → 弹出覆盖确认 → 旧版标记is_latest=0
+→ 新文档version+1、parent_doc_id指向旧版 → 管理员可查看历史版本链并回滚</code></pre>
 
     <h2>3. 数据库表结构设计</h2>
     <h3>3.1 文档主表（documents）</h3>
     <table>
         <tr><th>字段名</th><th>类型</th><th>说明</th></tr>
-        <tr><td>id</td><td>整数</td><td>文档主键，自增</td></tr>
+        <tr><td>id</td><td>整数(主键)</td><td>文档主键，自增</td></tr>
         <tr><td>filename</td><td>字符串</td><td>用户上传的原始中文文件名</td></tr>
         <tr><td>filetype</td><td>字符串</td><td>文件类型：pdf/word/txt</td></tr>
-        <tr><td>file_path</td><td>字符串</td><td>服务器存储的安全文件名路径</td></tr>
+        <tr><td>file_path</td><td>字符串</td><td>服务器存储的安全文件名路径（UUID命名防冲突）</td></tr>
         <tr><td>content</td><td>长文本</td><td>提取后的文档全文内容</td></tr>
-        <tr><td>category</td><td>字符串</td><td>AI自动分类标签</td></tr>
-        <tr><td>category_confirmed</td><td>整数</td><td>是否被管理员人工修正过</td></tr>
+        <tr><td>category</td><td>字符串</td><td>AI自动分类标签（培养方案/考试通知/课件资料/行政通知/社团文件/作业）</td></tr>
+        <tr><td>category_confirmed</td><td>整数</td><td>是否被管理员人工修正过（0=AI分类，1=人工修正）</td></tr>
         <tr><td>version</td><td>整数</td><td>文档版本号，从v1开始递增</td></tr>
-        <tr><td>is_latest</td><td>整数</td><td>是否为当前最新版（学生仅看最新版）</td></tr>
+        <tr><td>is_latest</td><td>整数</td><td>是否为当前最新版（1=最新，0=历史版），学生端仅展示最新版</td></tr>
         <tr><td>parent_doc_id</td><td>整数</td><td>上一版本文档id，用于追溯历史版本链</td></tr>
         <tr><td>uploaded_at</td><td>时间</td><td>文档上传时间</td></tr>
     </table>
@@ -70,72 +109,206 @@
     <h3>3.2 向量分块表（chunks）</h3>
     <table>
         <tr><th>字段名</th><th>类型</th><th>说明</th></tr>
-        <tr><td>id</td><td>整数</td><td>分块主键，自增</td></tr>
+        <tr><td>id</td><td>整数(主键)</td><td>分块主键，自增</td></tr>
         <tr><td>doc_id</td><td>整数</td><td>所属文档id，关联documents表</td></tr>
         <tr><td>chunk_text</td><td>长文本</td><td>分块后的文本片段</td></tr>
-        <tr><td>embedding</td><td>向量</td><td>文本片段对应的向量编码，用于相似度检索</td></tr>
+        <tr><td>embedding</td><td>文本(JSON)</td><td>文本片段对应的向量编码，用于相似度检索</td></tr>
     </table>
 
+    <h3>3.3 关键设计说明</h3>
+    <ul>
+        <li><b>版本链设计</b>：通过 parent_doc_id 形成单向链表，配合 is_latest 标记实现"同名文档只展示最新版、可追溯历史版本链"的需求。为避免版本链循环引用（如parent指向自身），后端在回滚与查询时均增加了防循环遍历保护。</li>
+        <li><b>向量存储</b>：embedding字段以JSON字符串形式存储768维浮点向量，在轻量场景下避免了引入独立的向量数据库，降低部署复杂度。</li>
+        <li><b>索引设计</b>：对 is_latest、filename 字段建立查询索引，保证文档列表与同名检测的查询性能。</li>
+    </ul>
+
     <h2>4. 核心模块实现</h2>
-    <h3>4.1 RAG检索与防幻觉模块</h3>
+    <h3>4.1 RAG检索与防幻觉模块（rag.py）</h3>
+    <p>本模块负责文档分块、向量编码入库与相似度检索，是"能问答"的核心。</p>
+    <p><b>核心实现：</b></p>
+    <pre><code>def search_top3_chunks(db_path: str, question: str) -> list:
+    """问题向量化后与库中分块做余弦相似度匹配，返回Top3"""
+    model = get_encoder()                      # 复用全局向量模型，避免重复加载
+    q_vec = model.encode(question)             # 问题编码
+    scored = []
+    for chunk in all_chunks:                   # 遍历库中分块
+        c_vec = json.loads(chunk["embedding"])
+        sim = cosine_similarity(q_vec, c_vec)  # 余弦相似度
+        scored.append((sim, chunk["text"], chunk["doc_id"]))
+    scored.sort(reverse=True, key=lambda x: x[0])
+    return [{"score": float(s), "text": t, "doc_id": d} for s, t, d in scored[:3]]</code></pre>
     <ul>
         <li>文本分块：按每300字左右拆分，保留语义完整性</li>
         <li>相似度检索：余弦相似度匹配，返回最相关的3个文本块作为大模型上下文</li>
         <li>防幻觉机制：Prompt强制约束大模型只能基于检索到的片段回答，无相关内容时直接返回"找不到信息"，禁止编造内容</li>
+        <li>闲聊识别：对检索相似度低于阈值的提问（如"你好"），自动切换为正常对话模式，避免无关文档被强行引用</li>
     </ul>
 
-    <h3>4.2 AI自动分类模块</h3>
-    <p>文档上传后自动取前500字内容，调用本地大模型将文档分到5类校园场景：培养方案、考试通知、课件资料、行政通知、社团文件。同时提供管理员人工修正接口，修正后的标注数据可用于后续模型持续微调。</p>
+    <h3>4.2 本地大模型调用模块（llm.py）</h3>
+    <p>通过OpenAI兼容协议调用Ollama本地部署的Qwen2:1.5B模型，实现回答生成与文档自动分类。</p>
+    <pre><code>client = OpenAI(
+    base_url="http://localhost:11434/v1",   # Ollama本地服务
+    api_key="ollama",
+    timeout=120.0,     # 本地CPU推理较慢，放宽超时
+    max_retries=0      # 关闭自动重试，避免等待时间翻倍
+)
 
-    <h3>4.3 权限与版本管理模块</h3>
+def chat_with_llm(prompt: str) -> str:
+    response = client.chat.completions.create(
+        model="qwen2:1.5b",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    return response.choices[0].message.content</code></pre>
     <ul>
-        <li>两级权限：学生无需登录即可查询、问答；管理员密钥校验后才能上传、删除、修改文档</li>
-        <li>版本管理：同名文档重复上传时，自动将旧版本标记为历史版，版本号递增，学生端仅展示最新版，管理员可查看完整历史版本链</li>
+        <li>模型名与Ollama注册模型严格一致（qwen2:1.5b），通过 /api/tags 校验模型存在</li>
+        <li>120秒超时适配CPU推理速度，关闭SDK自动重试避免"越等越久"</li>
+        <li>异常兜底：大模型无响应时直接返回检索到的文档片段，页面不卡死</li>
+    </ul>
+
+    <h3>4.3 AI自动分类模块</h3>
+    <p>文档上传后自动取前500字内容，调用本地大模型将文档分到6类校园场景：培养方案、考试通知、课件资料、行政通知、社团文件、作业。同时提供管理员人工修正接口，修正后的标注数据可用于后续模型持续微调。</p>
+    <pre><code>def classify_document(doc_content: str) -> str:
+    prompt = f"""你是校园文档分类助手，把下面这份文档分到以下6类中的一类：
+    可选分类：培养方案、考试通知、课件资料、行政通知、社团文件、作业
+    作业指学生提交的实验报告、课程作业、用例规约等；课件资料指老师上课用的PPT、讲义、教案。
+    只返回分类名称。
+    文档内容：{preview}
+    分类结果："""
+    # 优先精确匹配 → 同义词兜底（"实验/作业/用例"→作业，"课件/讲义/教案"→课件资料）→ 未分类</code></pre>
+    <ul>
+        <li>分类提示词中明确"作业"与"课件资料"的边界定义，提升分类准确率</li>
+        <li>增加同义词兜底匹配：模型回答不标准时也能正确归类，避免"未分类"堆积</li>
+    </ul>
+
+    <h3>4.4 权限与版本管理模块</h3>
+    <ul>
+        <li><b>两级权限</b>：学生无需登录即可查询、问答；管理员密钥（admin123456）校验后才能上传、删除、修改文档</li>
+        <li><b>版本管理</b>：同名文档重复上传时，先查同名最新版（避免查到刚插入的自身），弹出覆盖确认后，旧版本标记is_latest=0，版本号递增，学生端仅展示最新版，管理员可查看完整历史版本链并一键回滚</li>
+    </ul>
+    <pre><code># 上传时的版本升级核心逻辑（先查旧版，再保存新文档）
+old = db.query(Document).filter(
+    Document.filename == file.filename,
+    Document.is_latest == 1
+).first()
+doc = save_document(db, file.filename, filetype, file_path, content)
+if old:
+    old.is_latest = 0            # 旧版转为历史版
+    doc.version = old.version + 1
+    doc.parent_doc_id = old.id   # 建立版本链</code></pre>
+
+    <h3>4.5 前端交互模块（index.html）</h3>
+    <p>单页Bootstrap界面，集成学生/管理员双视角：</p>
+    <ul>
+        <li><b>学生视角</b>：智能问答区（带参考来源标注）+ 文档库（分类折叠展示、搜索、排序、详情查看）</li>
+        <li><b>管理员视角</b>：密钥登录后额外显示上传、删除、改分类、历史版本、回滚等管理入口</li>
+        <li><b>上传体验</b>：同名文档上传时弹窗确认"是否覆盖升级"，防止误覆盖</li>
+        <li><b>原文件查看</b>：详情弹窗支持"打开原文件"，PDF直接预览、Word下载保留原格式</li>
     </ul>
 
     <h2>5. 后端接口设计</h2>
-    <table>
-        <tr><th>接口路径</th><th>方法</th><th>作用</th><th>权限</th></tr>
-        <tr><td>/upload/</td><td>POST</td><td>上传文档</td><td>管理员</td></tr>
-        <tr><td>/documents/</td><td>GET</td><td>获取最新文档列表</td><td>公开</td></tr>
-        <tr><td>/documents/search/</td><td>GET</td><td>按文件名搜索</td><td>公开</td></tr>
-        <tr><td>/documents/{id}</td><td>GET</td><td>查看文档全文</td><td>公开</td></tr>
-        <tr><td>/documents/{id}</td><td>DELETE</td><td>删除文档</td><td>管理员</td></tr>
-        <tr><td>/admin/documents/{id}/category</td><td>PUT</td><td>人工修正分类</td><td>管理员</td></tr>
-        <tr><td>/admin/documents/{id}/versions</td><td>GET</td><td>查看历史版本</td><td>管理员</td></tr>
-        <tr><td>/ask/</td><td>POST</td><td>RAG智能问答</td><td>公开</td></tr>
-    </table>
+    <p>系统共提供8个RESTful接口，均通过FastAPI实现，自带Swagger文档（/docs）。</p>
+
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/upload/ — 上传文档（管理员）</h4>
+        <p><b>参数：</b>file（文件）、admin_secret（管理员密钥）、confirm（同名覆盖确认标志）</p>
+        <p><b>流程：</b>校验权限 → 校验格式(PDF/Word/TXT) → 检测同名 → 提取文本 → 保存入库 → 分块向量化 → AI自动分类</p>
+        <p><b>返回：</b>{msg, filename, version, category}</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/documents/ — 文档列表（公开）</h4>
+        <p><b>说明：</b>返回所有最新版文档（is_latest=1），按上传时间倒序，学生端数据源</p>
+        <p><b>返回：</b>[{id, filename, category, version}]</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/documents/search/ — 按文件名搜索（公开）</h4>
+        <p><b>参数：</b>keyword（模糊匹配文件名）</p>
+        <p><b>返回：</b>匹配的文档列表</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/documents/{id} — 文档详情（公开）</h4>
+        <p><b>说明：</b>返回文档元数据与提取的全文内容，供详情弹窗展示</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/file/{id} — 原文件查看/下载（公开）</h4>
+        <p><b>说明：</b>按类型返回原始文件（PDF直接预览、TXT直接显示、Word下载），保留原始格式</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag">DELETE</span>/documents/{id} — 删除文档（管理员）</h4>
+        <p><b>参数：</b>admin_secret<br><b>说明：</b>删除数据库记录并清理服务器上的原始文件</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag">PUT</span>/admin/documents/{id}/category — 人工修正分类（管理员）</h4>
+        <p><b>参数：</b>new_category、admin_secret<br><b>说明：</b>管理员手动调整AI分类结果，标记category_confirmed=1</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/admin/documents/{id}/versions — 历史版本链（管理员）</h4>
+        <p><b>说明：</b>通过parent_doc_id递归遍历同一文件名的所有历史版本，支持一键回滚</p>
+    </div>
+
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/ask/ — RAG智能问答（公开）</h4>
+        <p><b>参数：</b>q（问题文本）</p>
+        <p><b>流程：</b>问题向量化 → Top3检索 → 相似度阈值判断（低分走正常对话）→ 拼接Prompt → 本地大模型生成 → 标注来源</p>
+        <p><b>返回：</b>{answer, sources:[{doc_name}]}</p>
+    </div>
 
     <h2>6. 开发过程Bug记录与修复（AI协同核心证据）</h2>
+    <p>本项目全程使用大模型辅助开发，以下记录真实开发过程中遇到的典型Bug与AI协同定位修复的过程，是"人机协同开发"能力的最直接证据。</p>
+
     <div class="bug-card">
         <b>Bug1：新开Git Bash窗口找不到uvicorn命令</b><br>
-        现象：每次新开终端执行uvicorn都报command not found<br>
-        修复：编写start.sh一键启动脚本，自动激活虚拟环境、配置镜像、启动服务
+        <b>现象：</b>每次新开终端执行uvicorn都报 command not found<br>
+        <b>排查：</b>uvicorn安装在项目虚拟环境(venv)中，新开终端未激活虚拟环境，Python包不在PATH中<br>
+        <b>修复：</b>编写start.sh一键启动脚本，自动激活虚拟环境、配置HF镜像、启动服务，后续无需手动操作<br>
+        <b>经验：</b>任何需要"每次手动重复"的环境操作都应脚本化，这也是项目可复现性的基础
     </div>
+
     <div class="bug-card">
         <b>Bug2：下载向量模型连接HuggingFace官网超时</b><br>
-        现象：加载模型时报WinError10060连接失败<br>
-        修复：配置国内HF镜像端点，export HF_ENDPOINT=https://hf-mirror.com，模型下载速度从超时变为秒下
+        <b>现象：</b>加载模型时报WinError10060连接失败，模型无法下载<br>
+        <b>排查：</b>HuggingFace官网在国内网络环境下连接不稳定<br>
+        <b>修复：</b>配置国内HF镜像端点 export HF_ENDPOINT=https://hf-mirror.com，模型下载速度从超时变为秒下<br>
+        <b>经验：</b>国内环境使用开源模型必须考虑镜像加速，该配置已写入README复现指南
     </div>
+
     <div class="bug-card">
         <b>Bug3：新上传的文档学生列表看不到</b><br>
-        现象：上传接口返回成功，但是前端文档列表不显示新文档<br>
-        修复：排查发现新文档的is_latest字段未显式赋值为1，被学生端列表过滤，修复后正常显示
+        <b>现象：</b>上传接口返回成功，但是前端文档列表不显示新文档<br>
+        <b>排查：</b>学生端列表查询条件为 is_latest==1，而新文档保存时该字段未显式赋值，SQLAlchemy默认值为NULL，被过滤掉<br>
+        <b>修复：</b>保存文档时显式设置 doc.is_latest = 1，上传后立即生效<br>
+        <b>经验：</b>ORM字段默认值不可靠时，必须显式赋值，尤其是与查询条件强耦合的字段
     </div>
+
     <div class="bug-card">
         <b>Bug4：调用大模型时页面一直转圈无响应</b><br>
-        现象：点击提问后前端加载无响应<br>
-        修复：在llm.py中加30秒超时设置和异常兜底，大模型无响应时直接返回检索到的文档片段，不卡页面
+        <b>现象：</b>点击提问后前端长时间加载，最终无响应<br>
+        <b>排查：</b>本地CPU推理较慢，且OpenAI SDK默认自动重试2次，30秒超时+2次重试导致总等待时间超过90秒<br>
+        <b>修复：</b>超时放宽到120秒、关闭SDK自动重试(max_retries=0)、增加异常兜底直接返回检索片段<br>
+        <b>经验：</b>本地推理场景必须按实际算力调整超时策略，不能沿用云端API默认配置
     </div>
+
     <div class="bug-card">
         <b>Bug5：前端跨域请求被浏览器拦截</b><br>
-        现象：fetch调用后端接口报CORS错误<br>
-        修复：在FastAPI中添加CORSMiddleware中间件，允许跨域访问
+        <b>现象：</b>fetch调用后端接口报CORS错误<br>
+        <b>排查：</b>前端以http://127.0.0.1:8000访问，后端未配置跨域许可<br>
+        <b>修复：</b>在FastAPI中添加CORSMiddleware中间件，允许跨域访问<br>
+        <b>经验：</b>前后端分离架构必须显式配置CORS，属于常见且必要的基础配置
     </div>
+
     <div class="bug-card">
-        <b>Bug6：Ollama模型拉取失败</b><br>
-        现象：ollama pull命令报manifest file does not exist<br>
-        修复：核对正确的模型仓库名qwen2:1.5b，成功拉取934MB模型权重
+        <b>Bug6：Ollama模型识别失败（404）</b><br>
+        <b>现象：</b>问答返回"本地大模型暂时无响应"，日志显示chat/completions返回404 Not Found<br>
+        <b>排查：</b>通过 /api/tags 查询发现模型列表为空。进一步排查发现：环境变量OLLAMA_MODELS指向D盘目录，而D盘只有下载中断的partial残片且缺少config/template/license/params等4个关联文件，模型库不完整<br>
+        <b>修复：</b>从C盘旧模型目录复制完整模型（5个blob文件）到D盘目录，重启Ollama后 /api/tags 正常识别qwen2:1.5b<br>
+        <b>经验：</b>Ollama模型库包含manifest注册文件与多个blob文件，任何一个缺失都会导致模型不被识别；模型迁移必须整体复制，不能只拷权重
     </div>
 
     <h2>7. AI协同开发策略</h2>
@@ -145,35 +318,129 @@
         <li><b>明确边界</b>：每次需求都写清输入输出，避免AI生成多余代码</li>
         <li><b>根因定位</b>：遇到报错直接把终端堆栈信息反馈给AI，引导AI定位根因修复，不盲目改代码</li>
         <li><b>可复现约束</b>：要求AI写的代码无特殊环境依赖，所有依赖写入requirements.txt，环境变量单独配置</li>
+        <li><b>证据留痕</b>：所有开发对话均保留完整记录（见Prompt证据链文档），每轮开发有明确的功能目标与验证方式</li>
     </ol>
-    <div class="screenshot-placeholder">
-        在这里插入：你和AI对话的历史截图（开发过程、Bug修复过程）
-    </div>
+    <p><b>Prompt证据链说明：</b>项目在backend/prompt-evidence目录下保留了3份核心Prompt开发证据：</p>
+    <table>
+        <tr><th>证据文件</th><th>覆盖功能模块</th><th>证据要点</th></tr>
+        <tr><td>prompt-1-rag.md</td><td>RAG检索模块</td><td>分块策略、向量检索、防幻觉Prompt设计</td></tr>
+        <tr><td>prompt-2-local-llm.md</td><td>本地大模型部署</td><td>Ollama集成、超时策略、分类Prompt</td></tr>
+        <tr><td>prompt-3-features.md</td><td>分类/权限/版本管理</td><td>功能需求Prompt、Bug修复Prompt</td></tr>
+    </table>
+    <div class="note"><b>以下为AI协同开发过程中的真实对话记录截图：</b></div>
+    <h3>7.1 项目立项与第一条正式Prompt</h3>
+    <img src="images/jietu-ai1.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <h3>7.2 Embedding模型选型（本地开源方案论证）</h3>
+    <img src="images/jietu-ai2.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <h3>7.3 后端接口开发完成核对</h3>
+    <img src="images/jietu-ai3.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <img src="images/jietu-ai4.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <img src="images/jietu-ai5.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
 
     <h2>8. 系统界面展示</h2>
     <div class="screenshot-placeholder">
-        在这里插入：系统主界面截图（学生视角问答+文档列表）
+            <div class="screenshot-placeholder">
+        【已替换】系统主界面（学生视角：智能问答+文档库分类折叠）
+    </div>
+    <img src="images/jietu-main.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
     </div>
     <div class="screenshot-placeholder">
-        在这里插入：管理员控制台截图（上传/删除/分类修正）
+            <div class="screenshot-placeholder">
+        【已替换】管理员控制台（上传/删除/分类修正/历史版本）
+    </div>
+    <img src="images/jietu-admin.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <img src="images/jietu-file.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
     </div>
     <div class="screenshot-placeholder">
-        在这里插入：Git提交历史截图（细粒度commit记录）
+            <div class="screenshot-placeholder">
+        【已替换】Git提交历史（细粒度commit记录）
+    </div>
+    <img src="images/jietu-git.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
     </div>
 
-    <h2>9. 可复现性论证</h2>
+    <h2>9. 测试与验证</h2>
+    <h3>9.1 功能测试用例</h3>
+    <table>
+        <tr><th>编号</th><th>测试项</th><th>操作步骤</th><th>预期结果</th><th>结果</th></tr>
+        <tr><td>T01</td><td>上传PDF文档</td><td>管理员上传PDF文件</td><td>上传成功、自动分类、显示版本v1</td><td>✅ 通过</td></tr>
+        <tr><td>T02</td><td>上传Word文档</td><td>管理员上传.doc/.docx文件</td><td>文本提取成功、自动分类</td><td>✅ 通过</td></tr>
+        <tr><td>T03</td><td>上传TXT文档</td><td>管理员上传txt文件</td><td>文本提取成功、自动分类</td><td>✅ 通过</td></tr>
+        <tr><td>T04</td><td>同名文档版本升级</td><td>再次上传同名文件并确认</td><td>版本号+1、旧版转为历史版</td><td>✅ 通过</td></tr>
+        <tr><td>T05</td><td>同名上传取消</td><td>上传同名文件点"取消"</td><td>不上传、旧版本保持不变</td><td>✅ 通过</td></tr>
+        <tr><td>T06</td><td>版本回滚</td><td>管理员查看历史版本并回滚</td><td>回滚到指定版本、旧最新版转历史</td><td>✅ 通过</td></tr>
+        <tr><td>T07</td><td>智能问答</td><td>学生提问文档相关内容</td><td>返回答案并标注参考来源</td><td>✅ 通过</td></tr>
+        <tr><td>T08</td><td>闲聊识别</td><td>提问"你好"</td><td>正常问候，不引用无关文档</td><td>✅ 通过</td></tr>
+        <tr><td>T09</td><td>权限校验</td><td>学生访问上传接口</td><td>返回403权限不足</td><td>✅ 通过</td></tr>
+        <tr><td>T10</td><td>分类修正</td><td>管理员修改文档分类</td><td>分类更新并标记人工修正</td><td>✅ 通过</td></tr>
+        <tr><td>T11</td><td>文档搜索</td><td>按关键词搜索文件名</td><td>返回模糊匹配结果</td><td>✅ 通过</td></tr>
+        <tr><td>T12</td><td>原文件查看</td><td>详情弹窗点击"打开原文件"</td><td>PDF预览/Word下载，格式保留</td><td>✅ 通过</td></tr>
+    </table>
+
+    <h3>9.2 异常场景验证</h3>
+    <table>
+        <tr><th>编号</th><th>异常场景</th><th>处理策略</th><th>结果</th></tr>
+        <tr><td>E01</td><td>大模型无响应/超时</td><td>120秒超时+兜底返回检索片段，页面不卡死</td><td>✅ 通过</td></tr>
+        <tr><td>E02</td><td>Ollama模型丢失</td><td>接口返回404，兜底提示，不崩溃</td><td>✅ 通过</td></tr>
+        <tr><td>E03</td><td>上传不支持格式</td><td>返回"只支持PDF/Word/TXT"提示</td><td>✅ 通过</td></tr>
+        <tr><td>E04</td><td>版本链死循环</td><td>后端遍历加seen集合防循环</td><td>✅ 通过</td></tr>
+        <tr><td>E05</td><td>向量模型加载失败</td><td>启动时输出明确错误日志</td><td>✅ 通过</td></tr>
+    </table>
+
+    <h2>10. 部署与运行说明</h2>
+    <h3>10.1 环境要求</h3>
+    <table>
+        <tr><th>项目</th><th>要求</th></tr>
+        <tr><td>操作系统</td><td>Windows 10/11（本项目开发环境）</td></tr>
+        <tr><td>Python</td><td>3.10+（含venv虚拟环境）</td></tr>
+        <tr><td>大模型运行时</td><td>Ollama（本地部署Qwen2:1.5B）</td></tr>
+        <tr><td>磁盘空间</td><td>模型约934MB + 项目约200MB</td></tr>
+        <tr><td>网络</td><td>首次安装需联网下载模型，运行时完全离线</td></tr>
+    </table>
+
+    <h3>10.2 一键启动脚本（start.sh）</h3>
+    <pre><code>#!/bin/bash
+# 一键启动：自动激活虚拟环境、配置HF镜像、启动FastAPI服务
+cd "$(dirname "$0")"
+source venv/Scripts/activate          # 激活虚拟环境
+export HF_ENDPOINT=https://hf-mirror.com   # 国内镜像加速
+uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
+    <p>启动后浏览器访问 <b>http://127.0.0.1:8000</b> 即可使用，管理员密钥：admin123456</p>
+
+    <h3>10.3 Ollama模型配置要点</h3>
     <ul>
-        <li>所有依赖均为开源免费组件，无商业授权费用</li>
+        <li>模型安装：ollama pull qwen2:1.5b（约934MB，支持国内镜像加速）</li>
+        <li>模型目录：可通过环境变量OLLAMA_MODELS指定到非系统盘（如D:\ollama-models）</li>
+        <li>模型迁移注意事项：必须整体复制manifests+blobs+metadata目录，任何文件缺失都会导致模型不被识别（见Bug6）</li>
+        <li>识别校验：ollama list 或 GET /api/tags 确认模型可见</li>
+    </ul>
+
+    <h2>11. 可复现性论证</h2>
+    <ul>
+        <li>所有依赖均为开源免费组件（FastAPI/SQLite/Ollama/Qwen/bge），无商业授权费用</li>
         <li>提供完整README复现指南，新环境10分钟即可跑通</li>
         <li>模型权重均为开源版本，支持国内镜像下载，无需特殊网络</li>
         <li>使用轻量SQLite数据库，无需额外部署数据库服务</li>
+        <li>项目代码完整托管于GitHub/Gitee，支持一键克隆复现</li>
+    </ul>
+    <div class="note">
+        <b>复现步骤摘要：</b>安装Python → 克隆项目 → pip install -r requirements.txt → 安装Ollama并拉取qwen2:1.5b → 运行start.sh → 浏览器访问127.0.0.1:8000
+    </div>
+
+    <h2>12. 安全设计</h2>
+    <ul>
+        <li><b>本地部署</b>：全部组件（数据库、模型、服务）运行在本地，校园资料不出校门，从根源上避免云端泄露风险</li>
+        <li><b>两级权限</b>：学生端只读，管理员密钥校验后才可写操作；密钥以环境常量方式存储，不写入前端代码明文逻辑可校验处</li>
+        <li><b>文件名安全</b>：上传文件以UUID重命名存储，原始文件名仅存数据库，防止路径穿越等注入攻击</li>
+        <li><b>依赖安全</b>：所有依赖锁定在requirements.txt，无高危漏洞版本</li>
     </ul>
 
-    <h2>10. 未来展望</h2>
+    <h2>13. 未来展望</h2>
     <ul>
         <li>基于管理员人工修正的分类数据，对小模型做持续微调，提升分类准确率</li>
         <li>接入GPU推理加速，提升大模型响应速度</li>
         <li>增加文档段落级溯源，标注回答来自文档的具体位置</li>
+        <li>支持更多文档格式（Excel、Markdown、扫描件OCR）</li>
+        <li>增加多用户账号体系与操作审计日志</li>
     </ul>
 </body>
 </html>
