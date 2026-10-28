@@ -195,7 +195,7 @@ onMounted(loadDocs)
     <!-- 问答区 -->
     <el-col :xs="24" :md="16">
       <el-card shadow="never" class="chat-card">
-        <template #header><b>智能问答（学生 / 管理员均可使用）</b></template>
+        <template #header><b>智能问答（学生 / 老师 / 管理员均可使用）</b></template>
         <div ref="chatBox" class="chat-box">
           <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
             <div class="bubble">{{ m.content }}</div>

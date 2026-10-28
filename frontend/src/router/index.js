@@ -20,7 +20,8 @@ const routes = [
     component: () => import('../views/RoleLayout.vue'),
     meta: { requiresAuth: true, roles: ['teacher'] },
     children: [
-      { path: '', name: 'teacher-home', component: () => import('../views/AiChat.vue'), meta: { title: 'AI 问答' } }
+      { path: '', name: 'teacher-home', component: () => import('../views/AiChat.vue'), meta: { title: 'AI 问答' } },
+      { path: 'manage', name: 'teacher-manage', component: () => import('../views/TeacherManage.vue'), meta: { title: '公开内容管理' } }
     ]
   },
   {
@@ -28,7 +29,9 @@ const routes = [
     component: () => import('../views/RoleLayout.vue'),
     meta: { requiresAuth: true, roles: ['admin'] },
     children: [
-      { path: '', name: 'admin-home', component: () => import('../views/Placeholder.vue'), meta: { title: '后台首页' } }
+      { path: '', name: 'admin-home', component: () => import('../views/AdminHome.vue'), meta: { title: '后台首页' } },
+      { path: 'users', name: 'admin-users', component: () => import('../views/UserManage.vue'), meta: { title: '用户管理' } },
+      { path: 'public', name: 'admin-public', component: () => import('../views/AdminPublicManage.vue'), meta: { title: '公开内容管理' } }
     ]
   },
   // 公开路由（无需登录）：分享落地页、他人公开主页

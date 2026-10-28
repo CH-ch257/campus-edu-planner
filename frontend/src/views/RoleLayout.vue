@@ -17,10 +17,13 @@ const menus = computed(() => {
     { path: '/student/settings', label: '个人设置' }
   ]
   if (user.role === 'teacher') return [
-    { path: '/teacher', label: 'AI 问答' }
+    { path: '/teacher', label: 'AI 问答' },
+    { path: '/teacher/manage', label: '公开内容管理' }
   ]
   return [
-    { path: '/admin', label: '后台首页' }
+    { path: '/admin', label: '后台首页' },
+    { path: '/admin/users', label: '用户管理' },
+    { path: '/admin/public', label: '公开内容管理' }
   ]
 })
 

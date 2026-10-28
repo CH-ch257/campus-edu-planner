@@ -102,6 +102,13 @@ def get_current_teacher(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+def get_current_admin(current_user: User = Depends(get_current_user)):
+    """后台管理鉴权依赖：仅高级管理员可执行"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅高级管理员可执行此操作")
+    return current_user
+
+
 @app.get("/me/", summary="获取当前登录用户信息")
 def me(current_user: User = Depends(get_current_user)):
     return {"user_id": current_user.id, "username": current_user.username, "role": current_user.role}
@@ -222,7 +229,7 @@ def ask(q:str, db:Session=Depends(get_db), current_user: User = Depends(get_curr
     if not top:
         answer = "暂无相关文档，请先上传文档后再提问"
         srcs = []
-    elif top[0]["score"] < 0.35:
+    elif top[0]["score"] < 0.45:
         # 相似度阈值：检索结果与问题明显不相关时（如闲聊"你好"），走正常对话，不硬套文档
         answer = chat_with_llm(f"你是校园资料助手，请正常回答用户的问题：{q}")
         srcs = []
@@ -379,6 +386,82 @@ def del_public_qa(qa_id: int, db: Session = Depends(get_db), teacher: User = Dep
     db.delete(qa)
     db.commit()
     return {"msg": "删除成功"}
+
+
+@app.get("/teacher/qa/public/", summary="【教师】查看学生公开问答")
+def teacher_public_qa(db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    rows = db.query(QuestionAnswer, User).join(User, QuestionAnswer.user_id == User.id).filter(
+        QuestionAnswer.permission == "public", User.role == "student"
+    ).order_by(QuestionAnswer.created_at.desc()).all()
+    return [
+        {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
+         "note": qa.note or "", "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
+        for qa, u in rows
+    ]
+
+
+@app.get("/admin/qa/public/", summary="【管理员】查看全部公开问答")
+def admin_public_qa(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    rows = db.query(QuestionAnswer, User).join(User, QuestionAnswer.user_id == User.id).filter(
+        QuestionAnswer.permission == "public"
+    ).order_by(QuestionAnswer.created_at.desc()).all()
+    return [
+        {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
+         "note": qa.note or "", "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
+        for qa, u in rows
+    ]
+
+
+@app.delete("/admin/qa/{qa_id}", summary="【管理员】删除任意公开问答")
+def admin_del_public_qa(qa_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if qa.permission != "public":
+        raise HTTPException(status_code=403, detail="只能删除公开问答")
+    db.delete(qa)
+    db.commit()
+    return {"msg": "删除成功"}
+
+
+@app.get("/admin/users/", summary="【管理员】查看全部用户")
+def admin_users(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return [
+        {"id": u.id, "username": u.username, "role": u.role, "status": u.status,
+         "created_at": u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else ""}
+        for u in users
+    ]
+
+
+@app.post("/admin/teachers/", summary="【管理员】新增老师账号")
+def admin_create_teacher(username: str = Query(...), password: str = Query(...), db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    username = username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="用户名不能为空")
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="密码至少4位")
+    if db.query(User).filter(User.username == username).first():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    u = User(username=username, password_hash=hash_password(password), role="teacher", status=1)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {"msg": "老师账号已创建", "user_id": u.id, "username": u.username}
+
+
+@app.put("/admin/users/{user_id}/status", summary="【管理员】启用/禁用老师账号")
+def admin_set_status(user_id: int, status: int = Query(...), db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    if status not in (0, 1):
+        raise HTTPException(status_code=400, detail="无效状态")
+    u = db.query(User).filter(User.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if u.role != "teacher":
+        raise HTTPException(status_code=400, detail="只能启用/禁用老师账号")
+    u.status = status
+    db.commit()
+    return {"msg": "状态已更新"}
 
 if __name__ == "__main__":
     import uvicorn

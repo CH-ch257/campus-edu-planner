@@ -60,7 +60,16 @@ export const api = {
   userPublic: (userId) => request(`/users/${userId}/qa_public`),
   changePassword: (oldPassword, newPassword) =>
     request('/change_password/', { method: 'POST', params: { old_password: oldPassword, new_password: newPassword } }),
-  deletePublicQa: (id) => request(`/qa/${id}`, { method: 'DELETE' })
+  deletePublicQa: (id) => request(`/qa/${id}`, { method: 'DELETE' }),
+  // 教师公开内容管理
+  teacherPublicQa: () => request('/teacher/qa/public/'),
+  // 管理员后台
+  adminUsers: () => request('/admin/users/'),
+  adminCreateTeacher: (username, password) =>
+    request('/admin/teachers/', { method: 'POST', params: { username, password } }),
+  adminSetStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'PUT', params: { status } }),
+  adminPublicQa: () => request('/admin/qa/public/'),
+  adminDeletePublicQa: (id) => request(`/admin/qa/${id}`, { method: 'DELETE' })
 }
 
 export function fileUrl(id) {
