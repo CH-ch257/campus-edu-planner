@@ -35,9 +35,9 @@ export const useUserStore = defineStore('user', {
       localStorage.removeItem('user_id')
       localStorage.removeItem('role')
     },
-    // 文档管理密钥沿用原有硬编码逻辑，仅高级管理员可用
+    // 文档管理密钥沿用原有硬编码逻辑，仅教师可用
     adminSecret() {
-      return this.role === 'admin' ? 'admin123456' : ''
+      return this.role === 'teacher' ? 'admin123456' : ''
     }
   }
 })

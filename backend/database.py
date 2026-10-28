@@ -40,6 +40,7 @@ class Document(Base):
     version = Column(Integer, default=1, comment="文档版本号")
     is_latest = Column(Integer, default=1, comment="是否最新版本：1=是，0=历史版本")
     parent_doc_id = Column(Integer, nullable=True, comment="关联上一版本的文档id")
+    teacher_id = Column(Integer, nullable=True, comment="上传教师id（归属校验用）")
 
 class Chunk(Base):
     """文档分块表，用于RAG向量检索"""
@@ -49,6 +50,21 @@ class Chunk(Base):
     doc_id = Column(Integer, nullable=False, comment="关联documents表id")
     chunk_text = Column(Text, comment="分块文本")
     embedding = Column(Text, comment="向量json字符串")
+
+class QuestionAnswer(Base):
+    """问答记录表：AI问答留痕"""
+    __tablename__ = "qa_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True, comment="提问用户id")
+    question = Column(Text, nullable=False, comment="用户问题")
+    answer = Column(Text, nullable=False, comment="AI回答")
+    sources = Column(Text, comment="引用来源json：[{doc_id, doc_name}]")
+    source_doc_ids = Column(Text, comment="引用来源文档id，逗号分隔")
+    note = Column(Text, default="", comment="备注")
+    permission = Column(String(20), default="private", comment="权限：private/link/public")
+    share_token = Column(String(32), nullable=True, index=True, comment="分享token")
+    created_at = Column(DateTime, default=datetime.now, comment="提问时间")
 
 class User(Base):
     """用户表：注册/登录账号"""
@@ -83,6 +99,9 @@ def init_db():
             conn.execute(text("ALTER TABLE users ADD COLUMN status INTEGER DEFAULT 1"))
         if "token" not in cols:
             conn.execute(text("ALTER TABLE users ADD COLUMN token VARCHAR(64)"))
+        dcols = [r[1] for r in conn.execute(text("PRAGMA table_info(documents)"))]
+        if "teacher_id" not in dcols:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN teacher_id INTEGER"))
     # 预设固定账号：高级管理员 admin、老师 teacher（仅当不存在时创建，不开放注册）
     db = SessionLocal()
     try:

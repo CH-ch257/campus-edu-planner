@@ -32,27 +32,35 @@ export const api = {
   listDocuments: () => request('/documents/'),
   searchDocuments: (keyword) => request('/documents/search/', { params: { keyword } }),
   getDocument: (id) => request(`/documents/${id}`),
-  upload: (file, adminSecret, confirm) => {
+  upload: (file, confirm) => {
     const fd = new FormData()
     fd.append('file', file)
-    const params = { admin_secret: adminSecret }
+    const params = {}
     if (confirm) params.confirm = confirm
     return request('/upload/', { method: 'POST', params, body: fd, isForm: true })
   },
-  deleteDocument: (id, adminSecret) =>
-    request(`/documents/${id}`, { method: 'DELETE', params: { admin_secret: adminSecret } }),
-  updateCategory: (id, newCategory, adminSecret) =>
-    request(`/admin/documents/${id}/category`, { method: 'PUT', params: { new_category: newCategory, admin_secret: adminSecret } }),
-  getVersions: (id, adminSecret) =>
-    request(`/admin/documents/${id}/versions`, { params: { admin_secret: adminSecret } }),
-  rollback: (id, adminSecret) =>
-    request(`/admin/documents/${id}/rollback`, { method: 'POST', params: { admin_secret: adminSecret } }),
+  deleteDocument: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
+  updateCategory: (id, newCategory) =>
+    request(`/admin/documents/${id}/category`, { method: 'PUT', params: { new_category: newCategory } }),
+  getVersions: (id) => request(`/admin/documents/${id}/versions`),
+  rollback: (id) => request(`/admin/documents/${id}/rollback`, { method: 'POST' }),
   // 问答
   ask: (q) => request('/ask/', { method: 'POST', params: { q } }),
   // 用户
   login: (username, password) => request('/login/', { method: 'POST', params: { username, password } }),
   register: (username, password) => request('/register/', { method: 'POST', params: { username, password } }),
-  me: () => request('/me/')
+  me: () => request('/me/'),
+  // 问答历史 / 备注 / 权限 / 分享
+  qaHistory: (keyword) => request('/qa/history/', { params: { keyword } }),
+  qaNote: (id, note) => request(`/qa/${id}/note`, { method: 'PUT', params: { note } }),
+  qaPermission: (id, permission) => request(`/qa/${id}/permission`, { method: 'PUT', params: { permission } }),
+  qaShare: (id) => request(`/qa/${id}/share`, { method: 'POST' }),
+  qaShareView: (token) => request(`/qa/share/${token}`),
+  userProfile: (userId) => request(`/users/${userId}/profile`),
+  userPublic: (userId) => request(`/users/${userId}/qa_public`),
+  changePassword: (oldPassword, newPassword) =>
+    request('/change_password/', { method: 'POST', params: { old_password: oldPassword, new_password: newPassword } }),
+  deletePublicQa: (id) => request(`/qa/${id}`, { method: 'DELETE' })
 }
 
 export function fileUrl(id) {

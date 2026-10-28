@@ -114,14 +114,14 @@ async function upload() {
   const f = fileInput.value?.files?.[0]
   if (!f) return ElMessage.warning('请先选择文件')
   try {
-    let d = await api.upload(f, user.adminSecret())
+    let d = await api.upload(f)
     if (d.need_confirm) {
       await ElMessageBox.confirm(
         `已存在同名文档《${f.name}》（当前版本 v${d.current_version}），确定覆盖并升级为新版本吗？`,
         '覆盖确认',
         { type: 'warning', confirmButtonText: '覆盖升级', cancelButtonText: '取消' }
       )
-      d = await api.upload(f, user.adminSecret(), 'yes')
+      d = await api.upload(f, 'yes')
     }
     ElMessage.success(`上传成功：${d.filename}（${d.category} · v${d.version}）`)
     if (fileInput.value) fileInput.value.value = ''
@@ -138,7 +138,7 @@ async function delDoc(id) {
     return
   }
   try {
-    await api.deleteDocument(id, user.adminSecret())
+    await api.deleteDocument(id)
     ElMessage.success('删除成功')
     loadDocs()
   } catch (e) {
@@ -153,7 +153,7 @@ async function editCat(id, old) {
       '修改分类',
       { inputValue: old, confirmButtonText: '确定', cancelButtonText: '取消' }
     )
-    await api.updateCategory(id, value, user.adminSecret())
+    await api.updateCategory(id, value)
     ElMessage.success('分类已更新')
     loadDocs()
   } catch (e) {
@@ -163,7 +163,7 @@ async function editCat(id, old) {
 
 async function showVer(id) {
   try {
-    const data = await api.getVersions(id, user.adminSecret())
+    const data = await api.getVersions(id)
     versions.value = data
     verVisible.value = true
   } catch (e) {
@@ -178,7 +178,7 @@ async function rollback(id, ver) {
     return
   }
   try {
-    await api.rollback(id, user.adminSecret())
+    await api.rollback(id)
     ElMessage.success('回滚成功')
     verVisible.value = false
     loadDocs()
@@ -238,7 +238,7 @@ onMounted(loadDocs)
                 <span class="doc-title" @click="viewDoc(d.id)">{{ d.filename }}</span>
                 <el-tag size="small" type="info">v{{ d.version }}</el-tag>
               </div>
-              <div v-if="user.isAdmin" class="doc-actions">
+              <div v-if="user.isTeacher" class="doc-actions">
                 <el-button size="small" @click="editCat(d.id, d.category)">改分类</el-button>
                 <el-button size="small" @click="showVer(d.id)">历史版本</el-button>
                 <el-button size="small" type="danger" @click="delDoc(d.id)">删除</el-button>
@@ -247,8 +247,8 @@ onMounted(loadDocs)
           </el-collapse-item>
         </el-collapse>
 
-        <template v-if="user.isAdmin">
-          <el-divider>管理员上传</el-divider>
+        <template v-if="user.isTeacher">
+          <el-divider>教师上传</el-divider>
           <input ref="fileInput" type="file" accept=".pdf,.doc,.docx,.txt" class="file-input" />
           <el-button type="success" class="upload-btn" @click="upload">上传文档</el-button>
         </template>

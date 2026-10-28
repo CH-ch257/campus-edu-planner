@@ -10,9 +10,9 @@ const routes = [
     meta: { requiresAuth: true, roles: ['student'] },
     children: [
       { path: '', name: 'student-home', component: () => import('../views/AiChat.vue'), meta: { title: 'AI 问答' } },
-      { path: 'history', name: 'student-history', component: () => import('../views/Placeholder.vue'), meta: { title: '问答历史' } },
-      { path: 'profile', name: 'student-profile', component: () => import('../views/Placeholder.vue'), meta: { title: '个人主页' } },
-      { path: 'settings', name: 'student-settings', component: () => import('../views/Placeholder.vue'), meta: { title: '个人设置' } }
+      { path: 'history', name: 'student-history', component: () => import('../views/History.vue'), meta: { title: '问答历史' } },
+      { path: 'profile', name: 'student-profile', component: () => import('../views/Profile.vue'), meta: { title: '个人主页' } },
+      { path: 'settings', name: 'student-settings', component: () => import('../views/Settings.vue'), meta: { title: '个人设置' } }
     ]
   },
   {
@@ -31,6 +31,9 @@ const routes = [
       { path: '', name: 'admin-home', component: () => import('../views/Placeholder.vue'), meta: { title: '后台首页' } }
     ]
   },
+  // 公开路由（无需登录）：分享落地页、他人公开主页
+  { path: '/share/:token', name: 'share', component: () => import('../views/ShareView.vue'), meta: { title: '分享' } },
+  { path: '/u/:userId', name: 'public-profile', component: () => import('../views/PublicProfile.vue'), meta: { title: '个人主页' } },
   { path: '/', redirect: '/login' },
   { path: '/:pathMatch(.*)*', redirect: '/login' }
 ]
@@ -43,18 +46,21 @@ const router = createRouter({
 function homeOf(role) {
   if (role === 'admin') return '/admin'
   if (role === 'teacher') return '/teacher'
-  return '/student'
+  if (role === 'student') return '/student'
+  return '/login'
 }
 
 // 全局前置守卫：登录校验 + 角色越权拦截
 router.beforeEach((to) => {
   const user = useUserStore()
+  // 登录态必须 token 与合法角色同时存在才算已登录，否则视为未登录（防止残留脏数据导致无限重定向）
+  const logged = user.isLoggedIn && ['student', 'teacher', 'admin'].includes(user.role)
   if (to.meta.requiresAuth) {
-    if (!user.isLoggedIn) return { path: '/login', query: { redirect: to.fullPath } }
+    if (!logged) return { path: '/login', query: { redirect: to.fullPath } }
     if (to.meta.roles && !to.meta.roles.includes(user.role)) return homeOf(user.role)
   }
   // 已登录用户访问登录/注册页，跳转到自己角色首页
-  if ((to.path === '/login' || to.path === '/register') && user.isLoggedIn) {
+  if ((to.path === '/login' || to.path === '/register') && logged) {
     return homeOf(user.role)
   }
   return true

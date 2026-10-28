@@ -3,6 +3,7 @@
 """
 import os
 import uuid
+import json
 import hashlib
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Header
@@ -13,14 +14,13 @@ from database import (
     init_db, get_db, save_document, list_documents,
     get_document_by_id,
     extract_text_from_pdf, extract_text_from_word, extract_text_from_txt,
-    UPLOAD_DIR, Document, User
+    UPLOAD_DIR, Document, User, QuestionAnswer
 )
 from rag import save_chunks_to_db, search_top3_chunks
 from llm import chat_with_llm, classify_document
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-ADMIN_SECRET = "admin123456"
 
 
 def hash_password(password: str, salt: str = None) -> str:
@@ -95,20 +95,25 @@ def get_current_user(authorization: str = Header(None), db: Session = Depends(ge
     return user
 
 
+def get_current_teacher(current_user: User = Depends(get_current_user)):
+    """文档管理鉴权依赖：仅教师角色可执行"""
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="仅教师可执行此操作")
+    return current_user
+
+
 @app.get("/me/", summary="获取当前登录用户信息")
 def me(current_user: User = Depends(get_current_user)):
     return {"user_id": current_user.id, "username": current_user.username, "role": current_user.role}
 
 
-@app.post("/upload/", summary="【管理员专用】上传文档")
+@app.post("/upload/", summary="【教师专用】上传文档")
 async def upload_document(
     file: UploadFile = File(...),
-    admin_secret: str = Query(...),
     confirm: str = Query(None, description="存在同名文档时传yes确认覆盖升级"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    teacher: User = Depends(get_current_teacher)
 ):
-    if admin_secret != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="权限不足")
     ext = file.filename.lower().split(".")[-1]
     if ext == "pdf": filetype = "pdf"
     elif ext in ["doc","docx"]: filetype = "word"
@@ -127,6 +132,7 @@ async def upload_document(
     # 必须先查同名最新版本（在保存新文档之前查，否则会查到刚插入的自己，导致第一次上传就变v2）
     old = db.query(Document).filter(Document.filename==file.filename, Document.is_latest==1).first()
     doc = save_document(db, file.filename, filetype, file_path, content)
+    doc.teacher_id = teacher.id
     if old:
         old.is_latest = 0
         doc.version = old.version + 1
@@ -171,8 +177,7 @@ def get_file(doc_id:int, db:Session=Depends(get_db)):
     return FileResponse(doc.file_path, filename=doc.filename, media_type=media_map.get(doc.filetype, "application/octet-stream"))
 
 @app.delete("/documents/{doc_id}")
-def del_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
-    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+def del_doc(doc_id:int, db:Session=Depends(get_db), teacher: User = Depends(get_current_teacher)):
     doc = get_document_by_id(db, doc_id)
     if not doc: raise HTTPException(404, "文档不存在")
     if os.path.exists(doc.file_path): os.remove(doc.file_path)
@@ -180,16 +185,14 @@ def del_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db))
     return {"msg":"删除成功"}
 
 @app.put("/admin/documents/{doc_id}/category")
-def fix_cat(doc_id:int, new_category:str, admin_secret:str=Query(...), db:Session=Depends(get_db)):
-    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+def fix_cat(doc_id:int, new_category:str, db:Session=Depends(get_db), teacher: User = Depends(get_current_teacher)):
     doc = get_document_by_id(db, doc_id)
     doc.category = new_category
     db.commit()
     return {"msg":"分类已更新"}
 
 @app.get("/admin/documents/{doc_id}/versions")
-def get_versions(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
-    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+def get_versions(doc_id:int, db:Session=Depends(get_db), teacher: User = Depends(get_current_teacher)):
     res = []
     seen = set()
     cur = get_document_by_id(db, doc_id)
@@ -199,9 +202,8 @@ def get_versions(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get
         cur = get_document_by_id(db, cur.parent_doc_id) if cur.parent_doc_id else None
     return res
 
-@app.post("/admin/documents/{doc_id}/rollback", summary="【管理员专用】回滚到指定历史版本")
-def rollback_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get_db)):
-    if admin_secret != ADMIN_SECRET: raise HTTPException(403, "权限不足")
+@app.post("/admin/documents/{doc_id}/rollback", summary="【教师专用】回滚到指定历史版本")
+def rollback_doc(doc_id:int, db:Session=Depends(get_db), teacher: User = Depends(get_current_teacher)):
     target = get_document_by_id(db, doc_id)
     if not target: raise HTTPException(404, "文档不存在")
     # 把同文件名下当前的最新版标记为历史版
@@ -214,31 +216,169 @@ def rollback_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get
     logger.info(f"管理员已将文档《{target.filename}》回滚到v{target.version}")
     return {"msg": f"已回滚到 v{target.version}", "filename": target.filename, "version": target.version}
 
-@app.post("/ask/")
-def ask(q:str, db:Session=Depends(get_db)):
+@app.post("/ask/", summary="AI问答（登录用户，自动留痕）")
+def ask(q:str, db:Session=Depends(get_db), current_user: User = Depends(get_current_user)):
     top = search_top3_chunks("./campus.db", q)
-    if not top: return {"answer":"暂无相关文档，请先上传文档后再提问", "sources":[]}
-    # 相似度阈值：检索结果与问题明显不相关时（如闲聊"你好"），走正常对话，不硬套文档
-    if top[0]["score"] < 0.35:
-        ans = chat_with_llm(f"你是校园资料助手，请正常回答用户的问题：{q}")
-        return {"answer": ans, "sources": []}
-    context = "\n".join([i["text"] for i in top])
-    try:
-        ans = chat_with_llm(
-            f"你是校园资料助手。请根据下面检索到的文档片段回答用户问题。"
-            f"注意：如果文档片段与用户问题明显无关（比如用户只是打招呼、闲聊、问候），请不要引用文档，直接正常回答用户。\n\n"
-            f"文档片段：\n{context}\n\n用户问题：{q}"
-        )
-    except:
-        ans = f"[大模型临时无响应] 检索内容：{context[:500]}"
-    srcs = []
-    seen = set()
-    for i in top:
-        if i["doc_id"] not in seen:
-            seen.add(i["doc_id"])
-            d = get_document_by_id(db, i["doc_id"])
-            if d: srcs.append({"doc_name":d.filename})
-    return {"answer":ans, "sources":srcs}
+    if not top:
+        answer = "暂无相关文档，请先上传文档后再提问"
+        srcs = []
+    elif top[0]["score"] < 0.35:
+        # 相似度阈值：检索结果与问题明显不相关时（如闲聊"你好"），走正常对话，不硬套文档
+        answer = chat_with_llm(f"你是校园资料助手，请正常回答用户的问题：{q}")
+        srcs = []
+    else:
+        context = "\n".join([i["text"] for i in top])
+        try:
+            answer = chat_with_llm(
+                f"你是校园资料助手。请根据下面检索到的文档片段回答用户问题。"
+                f"注意：如果文档片段与用户问题明显无关（比如用户只是打招呼、闲聊、问候），请不要引用文档，直接正常回答用户。\n\n"
+                f"文档片段：\n{context}\n\n用户问题：{q}"
+            )
+        except:
+            answer = f"[大模型临时无响应] 检索内容：{context[:500]}"
+        srcs = []
+        seen = set()
+        for i in top:
+            if i["doc_id"] not in seen:
+                seen.add(i["doc_id"])
+                d = get_document_by_id(db, i["doc_id"])
+                if d:
+                    srcs.append({"doc_id": i["doc_id"], "doc_name": d.filename})
+    # 保存问答记录（留痕）
+    doc_ids = sorted({i["doc_id"] for i in top})
+    qa = QuestionAnswer(
+        user_id=current_user.id,
+        question=q,
+        answer=answer,
+        sources=json.dumps(srcs, ensure_ascii=False),
+        source_doc_ids=",".join(str(x) for x in doc_ids) if doc_ids else "",
+        permission="private",
+        note="",
+        share_token=uuid.uuid4().hex
+    )
+    db.add(qa)
+    db.commit()
+    db.refresh(qa)
+    return {"answer": answer, "sources": srcs, "qa_id": qa.id}
+
+
+def _qa_to_dict(r):
+    """问答记录序列化（登录用户自己的历史）"""
+    return {
+        "id": r.id,
+        "question": r.question,
+        "answer": r.answer,
+        "sources": json.loads(r.sources) if r.sources else [],
+        "note": r.note or "",
+        "permission": r.permission,
+        "share_token": r.share_token,
+        "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""
+    }
+
+
+@app.get("/qa/history/", summary="我的问答历史（支持搜索）")
+def qa_history(keyword: str = Query(None), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    q = db.query(QuestionAnswer).filter(QuestionAnswer.user_id == current_user.id)
+    if keyword:
+        q = q.filter(QuestionAnswer.question.contains(keyword) | QuestionAnswer.answer.contains(keyword))
+    records = q.order_by(QuestionAnswer.created_at.desc()).all()
+    return [_qa_to_dict(r) for r in records]
+
+
+@app.put("/qa/{qa_id}/note", summary="给问答记录写备注")
+def qa_note(qa_id: int, note: str = Query(""), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    qa.note = note
+    db.commit()
+    return {"msg": "备注已保存"}
+
+
+@app.put("/qa/{qa_id}/permission", summary="修改问答权限")
+def qa_permission(qa_id: int, permission: str = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if permission not in ("private", "link", "public"):
+        raise HTTPException(status_code=400, detail="无效权限")
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    qa.permission = permission
+    db.commit()
+    return {"msg": "权限已更新", "permission": permission}
+
+
+@app.post("/qa/{qa_id}/share", summary="生成分享链接")
+def qa_share(qa_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if qa.permission == "private":
+        raise HTTPException(status_code=400, detail="私有问答不能分享，请先修改权限")
+    return {"share_token": qa.share_token}
+
+
+@app.get("/qa/share/{token}", summary="分享落地页（无需登录）")
+def qa_share_view(token: str, db: Session = Depends(get_db)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.share_token == token).first()
+    if not qa or qa.permission == "private":
+        raise HTTPException(status_code=404, detail="分享内容不存在或已失效")
+    owner = db.query(User).filter(User.id == qa.user_id).first()
+    return {
+        "question": qa.question,
+        "answer": qa.answer,
+        "sources": json.loads(qa.sources) if qa.sources else [],
+        "note": qa.note or "",
+        "owner": owner.username if owner else ""
+    }
+
+
+@app.get("/users/{user_id}/profile", summary="用户公开主页信息（无需登录）")
+def user_profile(user_id: int, db: Session = Depends(get_db)):
+    u = db.query(User).filter(User.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return {"user_id": u.id, "username": u.username}
+
+
+@app.get("/users/{user_id}/qa_public", summary="用户公开问答列表（无需登录）")
+def user_public_qa(user_id: int, db: Session = Depends(get_db)):
+    records = db.query(QuestionAnswer).filter(
+        QuestionAnswer.user_id == user_id, QuestionAnswer.permission == "public"
+    ).order_by(QuestionAnswer.created_at.desc()).all()
+    return [
+        {"question": r.question, "answer": r.answer, "note": r.note or "", "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""}
+        for r in records
+    ]
+
+
+@app.post("/change_password/", summary="修改密码")
+def change_password(old_password: str = Query(...), new_password: str = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not verify_password(old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="原密码错误")
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="密码至少4位")
+    current_user.password_hash = hash_password(new_password)
+    db.commit()
+    return {"msg": "密码修改成功"}
+
+
+@app.delete("/qa/{qa_id}", summary="【教师】删除公开问答（仅限本人上传文档关联）")
+def del_public_qa(qa_id: int, db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if qa.permission != "public":
+        raise HTTPException(status_code=403, detail="只能删除公开问答")
+    doc_ids = [int(x) for x in (qa.source_doc_ids or "").split(",") if x.strip()]
+    if doc_ids:
+        owned = db.query(Document).filter(Document.id.in_(doc_ids), Document.teacher_id == teacher.id).count()
+    else:
+        owned = 0
+    if owned == 0:
+        raise HTTPException(status_code=403, detail="只能删除与你上传文档相关的公开问答")
+    db.delete(qa)
+    db.commit()
+    return {"msg": "删除成功"}
 
 if __name__ == "__main__":
     import uvicorn
