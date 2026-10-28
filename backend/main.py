@@ -3,15 +3,17 @@
 """
 import os
 import uuid
+import hashlib
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import (
     init_db, get_db, save_document, list_documents,
     get_document_by_id,
     extract_text_from_pdf, extract_text_from_word, extract_text_from_txt,
-    UPLOAD_DIR, Document
+    UPLOAD_DIR, Document, User
 )
 from rag import save_chunks_to_db, search_top3_chunks
 from llm import chat_with_llm, classify_document
@@ -20,9 +22,28 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 ADMIN_SECRET = "admin123456"
 
+
+def hash_password(password: str, salt: str = None) -> str:
+    """对密码加盐做SHA256哈希，返回 salt:hash 形式"""
+    salt = salt or uuid.uuid4().hex
+    digest = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"{salt}:{digest}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """校验密码是否与存储的哈希一致"""
+    try:
+        salt, digest = stored.split(":", 1)
+    except ValueError:
+        return False
+    return hashlib.sha256((salt + password).encode("utf-8")).hexdigest() == digest
+
 app = FastAPI(title="校园资料AI检索助手", version="1.0.0")
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# 挂载静态资源目录（docx-preview等前端库）
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 def startup():
@@ -31,6 +52,30 @@ def startup():
 @app.get("/", summary="前端首页")
 def read_root():
     return FileResponse("index.html")
+
+
+@app.post("/register/", summary="用户注册")
+def register(username: str = Query(...), password: str = Query(...), db: Session = Depends(get_db)):
+    username = username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="用户名不能为空")
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="密码至少4位")
+    if db.query(User).filter(User.username == username).first():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    user = User(username=username, password_hash=hash_password(password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"msg": "注册成功", "user_id": user.id, "username": user.username}
+
+
+@app.post("/login/", summary="用户登录")
+def login(username: str = Query(...), password: str = Query(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username.strip()).first()
+    if not user or not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=403, detail="用户名或密码错误")
+    return {"msg": "登录成功", "user_id": user.id, "username": user.username}
 
 @app.post("/upload/", summary="【管理员专用】上传文档")
 async def upload_document(
@@ -149,10 +194,18 @@ def rollback_doc(doc_id:int, admin_secret:str=Query(...), db:Session=Depends(get
 @app.post("/ask/")
 def ask(q:str, db:Session=Depends(get_db)):
     top = search_top3_chunks("./campus.db", q)
-    if not top: return {"answer":"暂无相关文档", "sources":[]}
+    if not top: return {"answer":"暂无相关文档，请先上传文档后再提问", "sources":[]}
+    # 相似度阈值：检索结果与问题明显不相关时（如闲聊"你好"），走正常对话，不硬套文档
+    if top[0]["score"] < 0.35:
+        ans = chat_with_llm(f"你是校园资料助手，请正常回答用户的问题：{q}")
+        return {"answer": ans, "sources": []}
     context = "\n".join([i["text"] for i in top])
     try:
-        ans = chat_with_llm(f"根据文档片段回答：{context}\n问题：{q}")
+        ans = chat_with_llm(
+            f"你是校园资料助手。请根据下面检索到的文档片段回答用户问题。"
+            f"注意：如果文档片段与用户问题明显无关（比如用户只是打招呼、闲聊、问候），请不要引用文档，直接正常回答用户。\n\n"
+            f"文档片段：\n{context}\n\n用户问题：{q}"
+        )
     except:
         ans = f"[大模型临时无响应] 检索内容：{context[:500]}"
     srcs = []
@@ -166,4 +219,5 @@ def ask(q:str, db:Session=Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # 0.0.0.0 让局域网内其他设备也能通过本机IP访问
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

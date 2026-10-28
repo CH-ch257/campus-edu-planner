@@ -48,6 +48,15 @@ class Chunk(Base):
     chunk_text = Column(Text, comment="分块文本")
     embedding = Column(Text, comment="向量json字符串")
 
+class User(Base):
+    """用户表：注册/登录账号"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True, comment="用户名")
+    password_hash = Column(String(128), nullable=False, comment="加盐哈希后的密码")
+    created_at = Column(DateTime, default=datetime.now, comment="注册时间")
+
 # ========== 建表 ==========
 
 def init_db():
