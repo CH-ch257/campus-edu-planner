@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <title>校园资料AI检索助手 技术文档</title>
     <style>
-        body { font-family: "Microsoft YaHei", sans-serif; max-width: 900px; margin: 0 auto; padding: 50px; line-height: 2.3; font-size: 15.5px; }
+        body { font-family: "Microsoft YaHei", sans-serif; max-width: 900px; margin: 0 auto; padding: 36px; line-height: 1.75; font-size: 12.5px; }
         h1 { text-align: center; font-size: 30px; margin-bottom: 45px; }
-        h2 { font-size: 22px; margin-top: 45px; border-bottom: 2px solid #333; padding-bottom: 9px; page-break-after: avoid; }
-        h3 { font-size: 19px; margin-top: 25px; page-break-after: avoid; }
+        h2 { font-size: 20px; margin-top: 30px; border-bottom: 2px solid #333; padding-bottom: 7px; page-break-after: avoid; }
+        h3 { font-size: 17px; margin-top: 18px; page-break-after: avoid; }
         .arch-diagram { background: #f5f7fb; padding: 30px; border-radius: 8px; margin: 20px 0; text-align: center; }
         .layer { background: #0d6efd; color: white; padding: 12px; margin: 8px 0; border-radius: 6px; }
         .screenshot-placeholder { border: 2px dashed #ccc; padding: 60px; text-align: center; color: #999; margin: 20px 0; border-radius: 8px; page-break-inside: avoid; }
@@ -43,12 +43,18 @@
     <h3>1.2 核心功能列表</h3>
     <ul>
         <li>多格式文档上传：支持PDF、Word、TXT格式，自动提取文本内容并入库</li>
-        <li>AI自动文档分类：自动按校园场景归类，支持管理员人工修正</li>
+        <li>AI自动文档分类：自动按校园场景归类，支持教师人工修正</li>
         <li>带溯源标注的智能问答：回答自动标注参考来源文档，防幻觉</li>
-        <li>两级权限隔离：学生可自由查询问答，管理员密钥才能上传/修改文档</li>
+        <li>三角色账号体系：学生（自行注册）/ 老师（管理员创建）/ 高级管理员（固定账号），密码加盐哈希加密存储</li>
+        <li>问答历史留痕：每次提问自动保存，支持搜索、备注、修改权限</li>
+        <li>三档内容权限：私有（仅自己可见）/ 仅链接可见（免登录分享）/ 公开（展示个人主页）</li>
+        <li>分享链接与个人主页：生成分享链接，公开问答聚合展示在个人主页</li>
         <li>文档版本管理：同名文档自动保留历史版本，优先展示最新版，支持一键回滚</li>
+        <li>教师文档管理：上传/删除/改分类/版本回滚归教师角色，按登录Token鉴权</li>
+        <li>管理员后台：用户管理（新增/启用/禁用老师账号）、公开内容总管理</li>
         <li>分类折叠展示：文档库按分类折叠，界面简洁清晰</li>
         <li>原文件查看：详情支持打开/下载原始文件，保留原始格式</li>
+        <li>前端工程化：Vue3 + Pinia + VueRouter + Element Plus 多页面应用，路由级鉴权</li>
     </ul>
 
     <h3>1.3 技术选型与依据</h3>
@@ -58,7 +64,8 @@
         <tr><td>数据库</td><td>SQLite（SQLAlchemy ORM）</td><td>零配置、单文件、免部署，满足轻量场景</td></tr>
         <tr><td>向量编码</td><td>BAAI/bge-small-zh-v1.5</td><td>中文语义效果好、模型小（约90MB）、CPU可实时推理</td></tr>
         <tr><td>大模型</td><td>Ollama 部署 Qwen2.5:3B</td><td>本地运行、数据不出校、3B参数在CPU上可运行</td></tr>
-        <tr><td>前端</td><td>Bootstrap 5 单页应用</td><td>无构建工具链，单文件可直接托管，部署简单</td></tr>
+        <tr><td>前端框架</td><td>Vue3 + Vite + Pinia + VueRouter</td><td>组件化多页面应用，状态管理统一，路由级权限控制</td></tr>
+        <tr><td>UI组件库</td><td>Element Plus</td><td>成熟Vue3组件库，表格/弹窗/表单开箱即用</td></tr>
         <tr><td>文本解析</td><td>PyMuPDF / python-docx</td><td>分别解析PDF与Word文档，纯本地处理</td></tr>
     </table>
 
@@ -66,11 +73,11 @@
     <h3>2.1 总体架构</h3>
     <p>系统采用轻量前后端分离架构，无重型依赖，部署简单：</p>
     <div class="arch-diagram">
-        <div class="layer">前端展示层：Bootstrap 单页界面（学生/管理员双视角）</div>
+        <div class="layer">前端展示层：Vue3 多页面应用（学生 / 老师 / 高级管理员三套界面 + 公共登录注册页）</div>
         <div style="font-size:20px">↓</div>
         <div class="layer">后端服务层：FastAPI 提供RESTful接口，权限校验、业务逻辑</div>
         <div style="font-size:20px">↓</div>
-        <div class="layer">数据层：SQLite 数据库（文档元数据、分块向量、版本信息）</div>
+        <div class="layer">数据层：SQLite 数据库（文档、分块向量、版本、用户、问答记录）</div>
         <div style="font-size:20px">↓</div>
         <div class="layer">模型层：
             <br>向量编码：BAAI/bge-small-zh-v1.5
@@ -183,7 +190,7 @@ def chat_with_llm(prompt: str) -> str:
 
     <h3>4.4 权限与版本管理模块</h3>
     <ul>
-        <li><b>两级权限</b>：学生无需登录即可查询、问答；管理员密钥（admin123456）校验后才能上传、删除、修改文档</li>
+        <li><b>三角色权限</b>：登录Token鉴权，学生/老师/高级管理员三角色隔离；文档管理归教师角色，私有问答任何角色不可见（详见第14章）</li>
         <li><b>版本管理</b>：同名文档重复上传时，先查同名最新版（避免查到刚插入的自身），弹出覆盖确认后，旧版本标记is_latest=0，版本号递增，学生端仅展示最新版，管理员可查看完整历史版本链并一键回滚</li>
     </ul>
     <pre><code># 上传时的版本升级核心逻辑（先查旧版，再保存新文档）
@@ -197,22 +204,24 @@ if old:
     doc.version = old.version + 1
     doc.parent_doc_id = old.id   # 建立版本链</code></pre>
 
-    <h3>4.5 前端交互模块（index.html）</h3>
-    <p>单页Bootstrap界面，集成学生/管理员双视角：</p>
+    <h3>4.5 前端交互模块（Vue3工程）</h3>
+    <p>Vue3多页面应用（frontend/），按角色组织界面：</p>
     <ul>
-        <li><b>学生视角</b>：智能问答区（带参考来源标注）+ 文档库（分类折叠展示、搜索、排序、详情查看）</li>
-        <li><b>管理员视角</b>：密钥登录后额外显示上传、删除、改分类、历史版本、回滚等管理入口</li>
+        <li><b>公共页</b>：登录、注册（仅学生）、分享落地页、个人主页</li>
+        <li><b>学生界面</b>：AI问答（带参考来源标注）+ 文档库（分类折叠、搜索、排序、详情）+ 问答历史（备注/权限/分享）+ 个人主页 + 个人设置</li>
+        <li><b>老师界面</b>：AI问答 + 文档管理（上传、删除、改分类、历史版本、回滚）+ 公开内容管理</li>
+        <li><b>管理员界面</b>：后台首页 + 用户管理（新增/启用/禁用老师账号）+ 公开内容总管理</li>
         <li><b>上传体验</b>：同名文档上传时弹窗确认"是否覆盖升级"，防止误覆盖</li>
         <li><b>原文件查看</b>：详情弹窗支持"打开原文件"，PDF直接预览、Word下载保留原格式</li>
     </ul>
 
     <h2>5. 后端接口设计</h2>
-    <p>系统共提供8个RESTful接口，均通过FastAPI实现，自带Swagger文档（/docs）。</p>
+    <p>系统共提供20+个RESTful接口，均通过FastAPI实现，自带Swagger文档（/docs）。</p>
 
     <div class="api-card">
-        <h4><span class="tag">POST</span>/upload/ — 上传文档（管理员）</h4>
-        <p><b>参数：</b>file（文件）、admin_secret（管理员密钥）、confirm（同名覆盖确认标志）</p>
-        <p><b>流程：</b>校验权限 → 校验格式(PDF/Word/TXT) → 检测同名 → 提取文本 → 保存入库 → 分块向量化 → AI自动分类</p>
+        <h4><span class="tag">POST</span>/upload/ — 上传文档（教师，Bearer Token鉴权）</h4>
+        <p><b>参数：</b>file（文件）、confirm（同名覆盖确认标志）；鉴权：Authorization: Bearer &lt;token&gt;（教师角色）</p>
+        <p><b>流程：</b>校验教师身份 → 校验格式(PDF/Word/TXT) → 检测同名 → 提取文本 → 保存入库（记录teacher_id归属）→ 分块向量化 → AI自动分类</p>
         <p><b>返回：</b>{msg, filename, version, category}</p>
     </div>
 
@@ -239,27 +248,87 @@ if old:
     </div>
 
     <div class="api-card">
-        <h4><span class="tag">DELETE</span>/documents/{id} — 删除文档（管理员）</h4>
-        <p><b>参数：</b>admin_secret<br><b>说明：</b>删除数据库记录并清理服务器上的原始文件</p>
+        <h4><span class="tag">DELETE</span>/documents/{id} — 删除文档（教师，Token鉴权）</h4>
+        <p><b>鉴权：</b>Bearer Token（教师角色）<br><b>说明：</b>删除数据库记录并清理服务器上的原始文件</p>
     </div>
 
     <div class="api-card">
-        <h4><span class="tag">PUT</span>/admin/documents/{id}/category — 人工修正分类（管理员）</h4>
-        <p><b>参数：</b>new_category、admin_secret<br><b>说明：</b>管理员手动调整AI分类结果，标记category_confirmed=1</p>
+        <h4><span class="tag">PUT</span>/admin/documents/{id}/category — 人工修正分类（教师，Token鉴权）</h4>
+        <p><b>参数：</b>new_category<br><b>鉴权：</b>Bearer Token（教师角色）<br><b>说明：</b>教师手动调整AI分类结果，标记category_confirmed=1</p>
     </div>
 
     <div class="api-card">
-        <h4><span class="tag green">GET</span>/admin/documents/{id}/versions — 历史版本链（管理员）</h4>
+        <h4><span class="tag green">GET</span>/admin/documents/{id}/versions — 历史版本链（教师，Token鉴权）</h4>
         <p><b>说明：</b>通过parent_doc_id递归遍历同一文件名的所有历史版本，支持一键回滚</p>
     </div>
 
     <div class="api-card">
-        <h4><span class="tag">POST</span>/ask/ — RAG智能问答（公开）</h4>
-        <p><b>参数：</b>q（问题文本）</p>
-        <p><b>流程：</b>问题向量化 → Top3检索 → 相似度阈值判断（低分走正常对话）→ 拼接Prompt → 本地大模型生成 → 标注来源</p>
-        <p><b>返回：</b>{answer, sources:[{doc_name}]}</p>
+        <h4><span class="tag">POST</span>/ask/ — RAG智能问答（登录用户，自动留痕）</h4>
+        <p><b>参数：</b>q（问题文本）；鉴权：Bearer Token（登录用户）</p>
+        <p><b>流程：</b>问题向量化 → Top3检索 → 相似度阈值判断（低分走正常对话）→ 拼接Prompt → 本地大模型生成 → 标注来源 → 自动保存问答记录（默认私有）</p>
+        <p><b>返回：</b>{answer, sources:[{doc_id, doc_name}], qa_id}</p>
     </div>
 
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/register/ — 学生注册</h4>
+        <p><b>参数：</b>username、password（≥4位）；角色固定为 student，用户名唯一校验，密码加盐SHA256存储</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/login/ — 登录</h4>
+        <p><b>参数：</b>username、password；返回 token + role，token 写入 users 表，禁用账号拒绝登录</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/me/ — 当前登录用户信息</h4>
+        <p><b>鉴权：</b>Bearer Token；返回 {user_id, username, role}</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/qa/history/ — 我的问答历史</h4>
+        <p><b>参数：</b>keyword（可选，搜索问题/答案）；返回本人全部问答记录</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">PUT</span>/qa/{id}/note — 写备注</h4>
+        <p><b>说明：</b>给本人问答记录添加备注，备注可见性跟随问答权限</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">PUT</span>/qa/{id}/permission — 修改权限</h4>
+        <p><b>参数：</b>permission（private / link / public）；私有问答不允许生成分享链接</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/qa/{id}/share — 生成分享链接</h4>
+        <p><b>说明：</b>返回分享token，供落地页 /qa/share/{token} 使用（免登录）</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/users/{id}/profile 与 /users/{id}/qa_public — 个人主页</h4>
+        <p><b>说明：</b>免登录查看用户公开信息与其公开问答列表</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/change_password/ — 修改密码</h4>
+        <p><b>参数：</b>old_password、new_password；校验原密码后重新加盐哈希存储</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/teacher/qa/public/ — 教师查看学生公开问答</h4>
+        <p><b>鉴权：</b>Bearer Token（教师角色）；仅返回学生 role 的公开问答</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">DELETE</span>/qa/{id} — 教师删除关联公开问答</h4>
+        <p><b>鉴权：</b>Bearer Token（教师角色）；校验问答为公开权限且来源文档归属于该教师（teacher_id匹配）</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/admin/users/ — 管理员查看全部用户</h4>
+        <p><b>鉴权：</b>Bearer Token（admin角色）；返回全部用户及账号状态</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/admin/teachers/ — 管理员新增老师账号</h4>
+        <p><b>鉴权：</b>Bearer Token（admin角色）；创建 role=teacher 账号</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">PUT</span>/admin/users/{id}/status — 管理员启用/禁用账号</h4>
+        <p><b>鉴权：</b>Bearer Token（admin角色）；禁用后该账号无法登录</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag green">GET</span>/admin/qa/public/ 与 <span class="tag">DELETE</span>/admin/qa/{id} — 管理员公开内容总管理</h4>
+        <p><b>鉴权：</b>Bearer Token（admin角色）；查看/删除全部用户公开问答</p>
+    </div>
     <h2>6. 开发过程Bug记录与修复（AI协同核心证据）</h2>
     <p>本项目全程使用大模型辅助开发，以下记录真实开发过程中遇到的典型Bug与AI协同定位修复的过程，是"人机协同开发"能力的最直接证据。</p>
 
@@ -338,25 +407,35 @@ if old:
     <img src="images/jietu-ai5.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
 
     <h2>8. 系统界面展示</h2>
+    <h3>8.1 新版多角色界面（Vue3工程）</h3>
     <div class="screenshot-placeholder">
-            <div class="screenshot-placeholder">
-        【已替换】系统主界面（学生视角：智能问答+文档库分类折叠）
+        <b>登录页（账号体系入口，学生/老师/高级管理员三角色）</b>
     </div>
-    <img src="images/jietu-main.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
-    </div>
+    <img src="images/jietu-vue-login.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
     <div class="screenshot-placeholder">
-            <div class="screenshot-placeholder">
-        【已替换】管理员控制台（上传/删除/分类修正/历史版本）
+        <b>学生AI问答界面（智能问答 + 文档库分类折叠 + 个人导航）</b>
     </div>
-    <img src="images/jietu-admin.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
-    <img src="images/jietu-file.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
-    </div>
+    <img src="images/jietu-vue-studentqa.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
     <div class="screenshot-placeholder">
-            <div class="screenshot-placeholder">
-        【已替换】Git提交历史（细粒度commit记录）
+        <b>问答历史页（自动留痕、备注、三档权限、生成分享链接）</b>
     </div>
-    <img src="images/jietu-git.png" style="width:100%; border:1px solid #ddd; border-radius:6px; margin:10px 0;">
+    <img src="images/jietu-vue-history.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
+    <div class="screenshot-placeholder">
+        <b>教师界面（AI问答 + 文档库 + 教师上传文档）</b>
     </div>
+    <img src="images/jietu-vue-doclibrary.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
+    <div class="screenshot-placeholder">
+        <b>管理员后台-用户管理（新增老师账号、启用/禁用、用户列表）</b>
+    </div>
+    <img src="images/jietu-vue-usermgmt.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
+    <div class="screenshot-placeholder">
+        <b>管理员后台-公开内容总管理（查看/删除全部用户公开问答）</b>
+    </div>
+    <img src="images/jietu-vue-adminpublic.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
+    <div class="screenshot-placeholder">
+        <b>Git提交历史（细粒度commit记录，全程AI协同开发留痕）</b>
+    </div>
+    <img src="images/jietu-git.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
 
     <h2>9. 测试与验证</h2>
     <h3>9.1 功能测试用例</h3>
@@ -374,6 +453,16 @@ if old:
         <tr><td>T10</td><td>分类修正</td><td>管理员修改文档分类</td><td>分类更新并标记人工修正</td><td>✅ 通过</td></tr>
         <tr><td>T11</td><td>文档搜索</td><td>按关键词搜索文件名</td><td>返回模糊匹配结果</td><td>✅ 通过</td></tr>
         <tr><td>T12</td><td>原文件查看</td><td>详情弹窗点击"打开原文件"</td><td>PDF预览/Word下载，格式保留</td><td>✅ 通过</td></tr>
+        <tr><td>T13</td><td>学生注册</td><td>注册页提交新用户名+密码</td><td>注册成功自动登录，密码加密存储</td><td>✅ 通过</td></tr>
+        <tr><td>T14</td><td>三角色登录</td><td>分别用学生/老师/管理员账号登录</td><td>跳转各自角色首页，界面菜单不同</td><td>✅ 通过</td></tr>
+        <tr><td>T15</td><td>问答自动留痕</td><td>学生提问后查看问答历史</td><td>记录自动保存，默认私有，显示来源</td><td>✅ 通过</td></tr>
+        <tr><td>T16</td><td>备注与权限修改</td><td>历史页写备注、改权限为公开</td><td>备注保存，问答出现在个人主页</td><td>✅ 通过</td></tr>
+        <tr><td>T17</td><td>分享链接</td><td>设为仅链接可见并生成分享链接</td><td>他人免登录打开落地页查看该问答</td><td>✅ 通过</td></tr>
+        <tr><td>T18</td><td>个人主页</td><td>访问学生公开主页 /u/{id}</td><td>展示该学生全部公开问答，免登录</td><td>✅ 通过</td></tr>
+        <tr><td>T19</td><td>教师文档管理</td><td>教师登录上传/删除/改分类文档</td><td>Token鉴权放行，admin不再有文档管理</td><td>✅ 通过</td></tr>
+        <tr><td>T20</td><td>教师删除关联公开问答</td><td>教师删除引用其文档的公开问答</td><td>校验归属通过删除；无关问答拒绝403</td><td>✅ 通过</td></tr>
+        <tr><td>T21</td><td>管理员用户管理</td><td>管理员新增/禁用老师账号</td><td>新增成功；禁用后该账号无法登录</td><td>✅ 通过</td></tr>
+        <tr><td>T22</td><td>管理员删任意公开问答</td><td>管理员删除任意学生公开问答</td><td>删除成功；私有问答拒绝删除</td><td>✅ 通过</td></tr>
     </table>
 
     <h3>9.2 异常场景验证</h3>
@@ -384,6 +473,10 @@ if old:
         <tr><td>E03</td><td>上传不支持格式</td><td>返回"只支持PDF/Word/TXT"提示</td><td>✅ 通过</td></tr>
         <tr><td>E04</td><td>版本链死循环</td><td>后端遍历加seen集合防循环</td><td>✅ 通过</td></tr>
         <tr><td>E05</td><td>向量模型加载失败</td><td>启动时输出明确错误日志</td><td>✅ 通过</td></tr>
+        <tr><td>E06</td><td>角色越权访问</td><td>学生直接访问/teacher、/admin路由</td><td>前端守卫拦截跳回学生首页</td><td>✅ 通过</td></tr>
+        <tr><td>E07</td><td>未登录访问受保护接口</td><td>不带Token调用/ask/、/qa/history/</td><td>返回401未登录</td><td>✅ 通过</td></tr>
+        <tr><td>E08</td><td>禁用账号登录</td><td>被禁用的老师账号尝试登录</td><td>返回403"账号已被禁用"</td><td>✅ 通过</td></tr>
+        <tr><td>E09</td><td>修改权限非法值</td><td>提交权限为其他字符串</td><td>校验拒绝，保持原权限</td><td>✅ 通过</td></tr>
     </table>
 
     <h2>10. 部署与运行说明</h2>
@@ -393,18 +486,24 @@ if old:
         <tr><td>操作系统</td><td>Windows 10/11（本项目开发环境）</td></tr>
         <tr><td>Python</td><td>3.10+（含venv虚拟环境）</td></tr>
         <tr><td>大模型运行时</td><td>Ollama（本地部署Qwen2.5:3B）</td></tr>
-        <tr><td>磁盘空间</td><td>模型约1.9GB + 项目约200MB</td></tr>
+        <tr><td>Node.js</td><td>18+（前端Vue3工程构建/开发）</td></tr>
+        <tr><td>磁盘空间</td><td>模型约1.9GB + 项目约300MB</td></tr>
         <tr><td>网络</td><td>首次安装需联网下载模型，运行时完全离线</td></tr>
     </table>
 
-    <h3>10.2 一键启动脚本（start.sh）</h3>
-    <pre><code>#!/bin/bash
-# 一键启动：自动激活虚拟环境、配置HF镜像、启动FastAPI服务
-cd "$(dirname "$0")"
-source venv/Scripts/activate          # 激活虚拟环境
-export HF_ENDPOINT=https://hf-mirror.com   # 国内镜像加速
-uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
-    <p>启动后浏览器访问 <b>http://127.0.0.1:8000</b> 即可使用，管理员密钥：admin123456</p>
+    <h3>10.2 启动与访问（前后端分离）</h3>
+    <p><b>① 启动后端（FastAPI）：</b></p>
+    <pre><code>cd backend
+source venv/Scripts/activate
+export HF_ENDPOINT=https://hf-mirror.com
+uvicorn main:app --host 0.0.0.0 --reload --port 8000</code></pre>
+    <p><b>② 启动前端开发模式（Vue3，另一终端）：</b></p>
+    <pre><code>cd frontend
+npm install      # 首次运行安装依赖
+npm run dev      # 访问 http://localhost:5173（已代理到8000后端）</code></pre>
+    <p><b>③ 预设账号：</b>高级管理员 admin / admin123；老师 teacher / teacher123；学生自行注册。</p>
+    <p><b>④ 局域网访问：</b>后端绑定 0.0.0.0 后，同一WiFi下其他设备通过 http://本机IP:8000 或 http://本机IP:5173 访问。</p>
+    <p><b>⑤ 生产部署：</b>前端 npm run build 生成 dist，由后端或静态服务器托管。</p>
 
     <h3>10.3 Ollama模型配置要点</h3>
     <ul>
@@ -429,7 +528,10 @@ uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
     <h2>12. 安全设计</h2>
     <ul>
         <li><b>本地部署</b>：全部组件（数据库、模型、服务）运行在本地，校园资料不出校门，从根源上避免云端泄露风险</li>
-        <li><b>两级权限</b>：学生端只读，管理员密钥校验后才可写操作；密钥以环境常量方式存储，不写入前端代码明文逻辑可校验处</li>
+        <li><b>三角色鉴权</b>：登录Token（Bearer）鉴权 + 后端角色依赖（get_current_user/teacher/admin）双校验，前端路由守卫防越权</li>
+        <li><b>密码安全</b>：随机盐+SHA256哈希存储，不存明文；修改密码需校验原密码</li>
+        <li><b>私有内容隔离</b>：私有问答与私有备注任何角色（含管理员）不可见，硬性规则在后端查询层强制</li>
+        <li><b>越权防护</b>：接口层按角色校验 + 前端路由守卫双层拦截，直接构造URL访问受保护页也无法通过</li>
         <li><b>文件名安全</b>：上传文件以UUID重命名存储，原始文件名仅存数据库，防止路径穿越等注入攻击</li>
         <li><b>依赖安全</b>：所有依赖锁定在requirements.txt，无高危漏洞版本</li>
     </ul>
@@ -440,7 +542,88 @@ uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
         <li>接入GPU推理加速，提升大模型响应速度</li>
         <li>增加文档段落级溯源，标注回答来自文档的具体位置</li>
         <li>支持更多文档格式（Excel、Markdown、扫描件OCR）</li>
-        <li>增加多用户账号体系与操作审计日志</li>
+        <li>增加操作审计日志与系统监控面板</li>
+        <li>接入云端大模型API（DeepSeek等）作为本地模型的降级方案</li>
+    </ul>
+    <h2>14. 多用户账号与三角色权限体系</h2>
+    <h3>14.1 角色模型</h3>
+    <table>
+        <tr><th>角色</th><th>获取方式</th><th>核心权限</th></tr>
+        <tr><td>学生（student）</td><td>自行注册</td><td>AI问答、问答历史留痕、备注、三档权限、分享链接、个人主页、修改密码</td></tr>
+        <tr><td>老师（teacher）</td><td>高级管理员创建</td><td>AI问答、文档管理（上传/删除/改分类/版本回滚）、删除与本人上传文档关联的公开问答</td></tr>
+        <tr><td>高级管理员（admin）</td><td>预设固定账号，不开放注册</td><td>用户管理（新增/启用/禁用老师账号）、公开内容总管理（查看/删除全部公开问答）</td></tr>
+    </table>
+    <h3>14.2 权限矩阵（硬性规则：任何角色不能查看他人私有问答、私有备注）</h3>
+    <table>
+        <tr><th>操作</th><th>学生</th><th>老师</th><th>高级管理员</th></tr>
+        <tr><td>查看自己的问答历史</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+        <tr><td>管理自己的问答（备注/权限/删除）</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+        <tr><td>查看他人私有问答</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
+        <tr><td>查看/删除学生公开问答</td><td>&#10007;</td><td>仅本人上传文档关联</td><td>&#10003;（全部）</td></tr>
+        <tr><td>上传/删除/改分类文档</td><td>&#10007;</td><td>&#10003;</td><td>&#10007;</td></tr>
+        <tr><td>新增/启用/禁用老师账号</td><td>&#10007;</td><td>&#10007;</td><td>&#10003;</td></tr>
+    </table>
+    <h3>14.3 认证与加密</h3>
+    <ul>
+        <li><b>密码加密</b>：随机盐 + SHA256 哈希存储（格式 salt:digest），数据库不存明文</li>
+        <li><b>登录态</b>：登录返回 token（uuid），存 users 表，前端 Authorization: Bearer &lt;token&gt; 携带</li>
+        <li><b>后端鉴权</b>：get_current_user / get_current_teacher / get_current_admin 三个依赖，按接口角色校验</li>
+        <li><b>前端路由守卫</b>：未登录访问受保护页跳登录页；越权访问跳回本人角色首页；已登录访问登录页自动跳转</li>
+        <li><b>预设账号</b>：admin/admin123（高级管理员）、teacher/teacher123（老师），仅不存在时创建</li>
+    </ul>
+
+    <h2>15. 问答历史与三档权限分享</h2>
+    <h3>15.1 问答记录表（qa_records）</h3>
+    <table>
+        <tr><th>字段</th><th>说明</th></tr>
+        <tr><td>user_id</td><td>提问用户</td></tr>
+        <tr><td>question / answer</td><td>问题与回答原文</td></tr>
+        <tr><td>sources / source_doc_ids</td><td>引用来源文档（名称+ID），用于溯源与归属校验</td></tr>
+        <tr><td>permission</td><td>三档权限：private（私有）/ link（仅链接）/ public（公开）</td></tr>
+        <tr><td>note</td><td>用户备注（跟随问答权限可见性）</td></tr>
+        <tr><td>share_token</td><td>分享链接唯一标识（UUID）</td></tr>
+    </table>
+    <h3>15.2 三档权限机制</h3>
+    <ul>
+        <li><b>私有</b>：仅提问者本人可见，不出现在任何公开位置</li>
+        <li><b>仅链接可见</b>：任何人凭分享链接（/qa/share/token）免登录查看，不出现在个人主页</li>
+        <li><b>公开</b>：展示在提问者个人主页（/u/userId），任何人可访问</li>
+        <li><b>硬性规则</b>：私有问答与私有备注任何角色（含管理员）不可见</li>
+    </ul>
+    <h3>15.3 分享与主页流程</h3>
+    <p>学生提问后自动留痕（默认私有）→ 在"问答历史"页可写备注、修改权限、生成分享链接 → 设为公开后自动出现在个人主页 → 他人通过分享链接或个人主页免登录浏览。</p>
+
+    <h2>16. 教师文档管理与管理员后台</h2>
+    <h3>16.1 文档管理归属迁移</h3>
+    <p>文档管理从"管理员密钥"模式迁移为<b>教师角色 + 登录Token鉴权</b>：上传接口记录文档归属（documents.teacher_id），删除/改分类/版本回滚接口均校验当前登录用户为老师角色。文档归属字段同时用于"教师删除关联公开问答"的校验。</p>
+    <h3>16.2 教师删除关联公开问答</h3>
+    <p>教师调用 DELETE /qa/{id} 时，后端校验：①问答必须为公开权限；②问答引用的来源文档（source_doc_ids）中至少一个属于该教师上传（documents.teacher_id == 教师ID），否则拒绝。保证教师只能清理自己文档产生的公开问答。</p>
+    <h3>16.3 管理员后台能力</h3>
+    <ul>
+        <li>查看全部用户（学生/老师/管理员）与账号状态</li>
+        <li>新增老师账号（用户名+密码，校验唯一）</li>
+        <li>启用/禁用老师账号（禁用后无法登录）</li>
+        <li>查看/删除全部用户的公开问答与公开备注</li>
+    </ul>
+
+    <h2>17. 前端工程化改造（Vue3）</h2>
+    <h3>17.1 技术架构</h3>
+    <p>前端从单页Bootstrap重构为 <b>Vue3 + Vite + Pinia + VueRouter + Element Plus</b> 多页面工程（frontend/ 目录），与后端FastAPI前后端分离。</p>
+    <h3>17.2 路由与页面结构</h3>
+    <table>
+        <tr><th>路由分组</th><th>页面</th><th>鉴权</th></tr>
+        <tr><td>公共</td><td>登录 /login、注册 /register、分享落地 /qa/share/:token、个人主页 /u/:userId</td><td>免登录</td></tr>
+        <tr><td>学生</td><td>AI问答 /student、问答历史 /student/history、个人主页 /student/profile、个人设置 /student/settings</td><td>登录+student</td></tr>
+        <tr><td>老师</td><td>AI问答 /teacher、公开内容管理 /teacher/manage</td><td>登录+teacher</td></tr>
+        <tr><td>管理员</td><td>后台首页 /admin、用户管理 /admin/users、公开内容管理 /admin/public</td><td>登录+admin</td></tr>
+    </table>
+    <h3>17.3 工程组织</h3>
+    <ul>
+        <li>src/views：按角色组织的页面组件（AiChat / Login / Register / History / Profile / Settings / TeacherManage / AdminHome / UserManage / AdminPublicManage / ShareView / PublicProfile）</li>
+        <li>src/stores/user.js：Pinia 登录态（token + role），getters 提供 isStudent / isTeacher / isAdmin</li>
+        <li>src/router/index.js：全量路由 + 全局前置守卫（登录校验 + 角色越权拦截）</li>
+        <li>src/api/index.js：统一接口封装，自动携带 Authorization 头</li>
+        <li>vite.config.js：开发模式代理后端接口到 8000，host 0.0.0.0 支持局域网访问</li>
     </ul>
 </body>
 </html>
