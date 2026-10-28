@@ -57,12 +57,45 @@ async function ask() {
   messages.value.push({ role: 'user', content: q, sources: [] })
   question.value = ''
   asking.value = true
+  const aiMsg = { role: 'ai', content: '', sources: [], streaming: true }
+  messages.value.push(aiMsg)
   scrollBottom()
   try {
-    const data = await api.ask(q)
-    messages.value.push({ role: 'ai', content: data.answer, sources: data.sources || [] })
+    const res = await fetch(`/ask/?q=${encodeURIComponent(q)}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + user.token }
+    })
+    if (!res.ok) {
+      let detail = '请求失败'
+      try { detail = (await res.json()).detail || detail } catch (e) {}
+      throw new Error(detail)
+    }
+    // 流式读取 SSE：边生成边显示，不用干等模型算完
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim()
+        if (payload === '[DONE]') continue
+        try {
+          const obj = JSON.parse(payload)
+          if (obj.c) {
+            aiMsg.content += obj.c
+            scrollBottom()
+          }
+          if (obj.sources) aiMsg.sources = obj.sources
+        } catch (e) {}
+      }
+    }
   } catch (e) {
-    messages.value.push({ role: 'ai', content: e.message, sources: [] })
+    aiMsg.content = e.message || '请求失败'
   } finally {
     asking.value = false
     scrollBottom()
@@ -205,15 +238,14 @@ onMounted(loadDocs)
           <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
             <div v-if="m.role === 'ai'" class="avatar">✦</div>
             <div class="msg-body">
-              <div class="bubble">{{ m.content }}</div>
+              <div class="bubble" :class="{ typing: !m.content && m.streaming }">
+                <template v-if="m.content">{{ m.content }}</template>
+                <template v-else-if="m.streaming">思考中<span>.</span><span>.</span><span>.</span></template>
+              </div>
               <div v-if="m.sources && m.sources.length" class="source-tag">
                 📎 参考：{{ m.sources.map(s => s.doc_name).join('、') }}
               </div>
             </div>
-          </div>
-          <div v-if="asking" class="msg ai">
-            <div class="avatar">✦</div>
-            <div class="msg-body"><div class="bubble typing">思考中<span>.</span><span>.</span><span>.</span></div></div>
           </div>
         </div>
         <div class="input-bar">

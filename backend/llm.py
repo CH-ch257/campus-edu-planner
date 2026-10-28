@@ -8,16 +8,38 @@ client = OpenAI(
 )
 
 def chat_with_llm(prompt: str) -> str:
-    """调用本地千问模型生成回答"""
+    """调用本地千问模型生成回答（非流式，用于分类等短任务）"""
     try:
         response = client.chat.completions.create(
             model="qwen2.5:3b",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=400,
+            extra_body={"keep_alive": -1}   # 模型常驻内存，避免每次问答重新加载
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"[本地大模型暂时无响应] 检索到的相关内容：{prompt[-500:]}"
+
+def chat_stream(prompt: str):
+    """流式调用本地千问模型，逐块 yield 生成内容；模型常驻内存 + 限制输出长度保证响应速度"""
+    try:
+        stream = client.chat.completions.create(
+            model="qwen2.5:3b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=600,                 # 限制单次回答长度，防止无限生成拖慢演示
+            stream=True,
+            extra_body={"keep_alive": -1}   # 模型常驻内存，避免每次问答重新加载
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+    except Exception as e:
+        yield f"[本地大模型暂时无响应] {e}"
 
 def classify_document(doc_content: str) -> str:
     """自动给上传的文档分类"""

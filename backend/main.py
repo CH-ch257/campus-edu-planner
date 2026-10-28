@@ -7,7 +7,7 @@ import json
 import hashlib
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Header
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import (
@@ -17,7 +17,7 @@ from database import (
     UPLOAD_DIR, Document, User, QuestionAnswer
 )
 from rag import save_chunks_to_db, search_top3_chunks
-from llm import chat_with_llm, classify_document
+from llm import chat_with_llm, chat_stream, classify_document
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -223,26 +223,30 @@ def rollback_doc(doc_id:int, db:Session=Depends(get_db), teacher: User = Depends
     logger.info(f"管理员已将文档《{target.filename}》回滚到v{target.version}")
     return {"msg": f"已回滚到 v{target.version}", "filename": target.filename, "version": target.version}
 
-@app.post("/ask/", summary="AI问答（登录用户，自动留痕）")
-def ask(q:str, db:Session=Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.post("/ask/", summary="AI问答（登录用户，自动留痕，流式输出）")
+def ask(q: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     top = search_top3_chunks("./campus.db", q)
     if not top:
-        answer = "暂无相关文档，请先上传文档后再提问"
-        srcs = []
-    elif top[0]["score"] < 0.45:
+        def gen_no_doc():
+            text = "暂无相关文档，请先上传文档后再提问"
+            yield f"data: {json.dumps({'c': text}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'sources': []}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+            _save_qa(db, current_user.id, q, text, [], [])
+        return StreamingResponse(gen_no_doc(), media_type="text/event-stream")
+    if top[0]["score"] < 0.45:
         # 相似度阈值：检索结果与问题明显不相关时（如闲聊"你好"），走正常对话，不硬套文档
-        answer = chat_with_llm(f"你是校园资料助手，请正常回答用户的问题：{q}")
+        prompt = f"你是校园资料助手，请正常回答用户的问题：{q}"
         srcs = []
+        doc_ids = []
     else:
-        context = "\n".join([i["text"] for i in top])
-        try:
-            answer = chat_with_llm(
-                f"你是校园资料助手。请根据下面检索到的文档片段回答用户问题。"
-                f"注意：如果文档片段与用户问题明显无关（比如用户只是打招呼、闲聊、问候），请不要引用文档，直接正常回答用户。\n\n"
-                f"文档片段：\n{context}\n\n用户问题：{q}"
-            )
-        except:
-            answer = f"[大模型临时无响应] 检索内容：{context[:500]}"
+        # 每个片段限300字：控制输入长度，显著降低本地CPU模型prefill耗时
+        context = "\n".join([i["text"][:300] for i in top])
+        prompt = (
+            f"你是校园资料助手。请根据下面检索到的文档片段回答用户问题。"
+            f"注意：如果文档片段与用户问题明显无关（比如用户只是打招呼、闲聊、问候），请不要引用文档，直接正常回答用户。\n\n"
+            f"文档片段：\n{context}\n\n用户问题：{q}"
+        )
         srcs = []
         seen = set()
         for i in top:
@@ -251,11 +255,30 @@ def ask(q:str, db:Session=Depends(get_db), current_user: User = Depends(get_curr
                 d = get_document_by_id(db, i["doc_id"])
                 if d:
                     srcs.append({"doc_id": i["doc_id"], "doc_name": d.filename})
-    # 保存问答记录（留痕）
-    doc_ids = sorted({i["doc_id"] for i in top})
+        doc_ids = sorted({i["doc_id"] for i in top})
+
+    def gen_stream():
+        full = ""
+        try:
+            for piece in chat_stream(prompt):
+                full += piece
+                yield f"data: {json.dumps({'c': piece}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            err = f"[大模型临时无响应] {e}"
+            full = err
+            yield f"data: {json.dumps({'c': err}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'sources': srcs}, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+        _save_qa(db, current_user.id, q, full, srcs, doc_ids)
+
+    return StreamingResponse(gen_stream(), media_type="text/event-stream")
+
+
+def _save_qa(db, user_id, question, answer, srcs, doc_ids):
+    """流式结束后保存问答记录（留痕）"""
     qa = QuestionAnswer(
-        user_id=current_user.id,
-        question=q,
+        user_id=user_id,
+        question=question,
         answer=answer,
         sources=json.dumps(srcs, ensure_ascii=False),
         source_doc_ids=",".join(str(x) for x in doc_ids) if doc_ids else "",
@@ -265,8 +288,7 @@ def ask(q:str, db:Session=Depends(get_db), current_user: User = Depends(get_curr
     )
     db.add(qa)
     db.commit()
-    db.refresh(qa)
-    return {"answer": answer, "sources": srcs, "qa_id": qa.id}
+    return qa
 
 
 def _qa_to_dict(r):
