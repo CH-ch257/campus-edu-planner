@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api'
 
 const list = ref([])
@@ -38,11 +38,19 @@ async function createTeacher() {
   }
 }
 
-async function toggleStatus(row) {
-  const next = row.status === 1 ? 0 : 1
+async function delUser(row) {
   try {
-    await api.adminSetStatus(row.id, next)
-    ElMessage.success(next === 1 ? '已启用' : '已禁用')
+    await ElMessageBox.confirm(
+      `确定删除账号「${row.username}」吗？该用户的文档与问答记录将一并删除，不可恢复。`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch (e) {
+    return
+  }
+  try {
+    await api.adminDeleteUser(row.id)
+    ElMessage.success('用户已删除')
     load()
   } catch (e) {
     ElMessage.error(e.message)
@@ -90,13 +98,13 @@ onMounted(load)
           <el-table-column label="操作" width="110">
             <template #default="{ row }">
               <el-button
-                v-if="row.role === 'teacher'"
+                v-if="row.role !== 'admin'"
                 size="small"
-                :type="row.status === 1 ? 'danger' : 'success'"
+                type="danger"
                 plain
-                @click="toggleStatus(row)"
+                @click="delUser(row)"
               >
-                {{ row.status === 1 ? '禁用' : '启用' }}
+                删除
               </el-button>
             </template>
           </el-table-column>

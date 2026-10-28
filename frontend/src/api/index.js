@@ -67,7 +67,7 @@ export const api = {
   adminUsers: () => request('/admin/users/'),
   adminCreateTeacher: (username, password) =>
     request('/admin/teachers/', { method: 'POST', params: { username, password } }),
-  adminSetStatus: (id, status) => request(`/admin/users/${id}/status`, { method: 'PUT', params: { status } }),
+  adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
   adminPublicQa: () => request('/admin/qa/public/'),
   adminDeletePublicQa: (id) => request(`/admin/qa/${id}`, { method: 'DELETE' })
 }

@@ -450,18 +450,21 @@ def admin_create_teacher(username: str = Query(...), password: str = Query(...),
     return {"msg": "老师账号已创建", "user_id": u.id, "username": u.username}
 
 
-@app.put("/admin/users/{user_id}/status", summary="【管理员】启用/禁用老师账号")
-def admin_set_status(user_id: int, status: int = Query(...), db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-    if status not in (0, 1):
-        raise HTTPException(status_code=400, detail="无效状态")
+@app.delete("/admin/users/{user_id}", summary="【管理员】直接删除用户账号（级联清理其文档与问答）")
+def admin_delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="用户不存在")
-    if u.role != "teacher":
-        raise HTTPException(status_code=400, detail="只能启用/禁用老师账号")
-    u.status = status
+    if u.id == admin.id:
+        raise HTTPException(status_code=400, detail="不能删除自己的账号")
+    if u.role == "admin":
+        raise HTTPException(status_code=400, detail="不能删除高级管理员账号")
+    # 级联清理：该用户上传的文档 + 该用户的所有问答记录
+    db.query(Document).filter(Document.teacher_id == user_id).delete(synchronize_session=False)
+    db.query(QuestionAnswer).filter(QuestionAnswer.user_id == user_id).delete(synchronize_session=False)
+    db.delete(u)
     db.commit()
-    return {"msg": "状态已更新"}
+    return {"msg": "用户已删除"}
 
 if __name__ == "__main__":
     import uvicorn
