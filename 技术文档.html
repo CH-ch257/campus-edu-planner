@@ -57,7 +57,7 @@
         <tr><td>后端框架</td><td>FastAPI + Uvicorn</td><td>轻量、性能高、自带接口文档（/docs），适合本地部署</td></tr>
         <tr><td>数据库</td><td>SQLite（SQLAlchemy ORM）</td><td>零配置、单文件、免部署，满足轻量场景</td></tr>
         <tr><td>向量编码</td><td>BAAI/bge-small-zh-v1.5</td><td>中文语义效果好、模型小（约90MB）、CPU可实时推理</td></tr>
-        <tr><td>大模型</td><td>Ollama 部署 Qwen2:1.5B</td><td>本地运行、数据不出校、1.5B参数在CPU上可运行</td></tr>
+        <tr><td>大模型</td><td>Ollama 部署 Qwen2.5:3B</td><td>本地运行、数据不出校、3B参数在CPU上可运行</td></tr>
         <tr><td>前端</td><td>Bootstrap 5 单页应用</td><td>无构建工具链，单文件可直接托管，部署简单</td></tr>
         <tr><td>文本解析</td><td>PyMuPDF / python-docx</td><td>分别解析PDF与Word文档，纯本地处理</td></tr>
     </table>
@@ -74,7 +74,7 @@
         <div style="font-size:20px">↓</div>
         <div class="layer">模型层：
             <br>向量编码：BAAI/bge-small-zh-v1.5
-            <br>大模型生成：Ollama 部署 Qwen2:1.5b
+            <br>大模型生成：Ollama 部署 Qwen2.5:3b
         </div>
     </div>
 
@@ -145,7 +145,7 @@
     </ul>
 
     <h3>4.2 本地大模型调用模块（llm.py）</h3>
-    <p>通过OpenAI兼容协议调用Ollama本地部署的Qwen2:1.5B模型，实现回答生成与文档自动分类。</p>
+    <p>通过OpenAI兼容协议调用Ollama本地部署的Qwen2.5:3B模型，实现回答生成与文档自动分类。</p>
     <pre><code>client = OpenAI(
     base_url="http://localhost:11434/v1",   # Ollama本地服务
     api_key="ollama",
@@ -155,13 +155,13 @@
 
 def chat_with_llm(prompt: str) -> str:
     response = client.chat.completions.create(
-        model="qwen2:1.5b",
+        model="qwen2.5:3b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3
     )
     return response.choices[0].message.content</code></pre>
     <ul>
-        <li>模型名与Ollama注册模型严格一致（qwen2:1.5b），通过 /api/tags 校验模型存在</li>
+        <li>模型名与Ollama注册模型严格一致（qwen2.5:3b），通过 /api/tags 校验模型存在</li>
         <li>120秒超时适配CPU推理速度，关闭SDK自动重试避免"越等越久"</li>
         <li>异常兜底：大模型无响应时直接返回检索到的文档片段，页面不卡死</li>
     </ul>
@@ -307,7 +307,7 @@ if old:
         <b>Bug6：Ollama模型识别失败（404）</b><br>
         <b>现象：</b>问答返回"本地大模型暂时无响应"，日志显示chat/completions返回404 Not Found<br>
         <b>排查：</b>通过 /api/tags 查询发现模型列表为空。进一步排查发现：环境变量OLLAMA_MODELS指向D盘目录，而D盘只有下载中断的partial残片且缺少config/template/license/params等4个关联文件，模型库不完整<br>
-        <b>修复：</b>从C盘旧模型目录复制完整模型（5个blob文件）到D盘目录，重启Ollama后 /api/tags 正常识别qwen2:1.5b<br>
+        <b>修复：</b>从C盘旧模型目录复制完整模型（5个blob文件）到D盘目录，重启Ollama后 /api/tags 正常识别qwen2.5:3b<br>
         <b>经验：</b>Ollama模型库包含manifest注册文件与多个blob文件，任何一个缺失都会导致模型不被识别；模型迁移必须整体复制，不能只拷权重
     </div>
 
@@ -392,8 +392,8 @@ if old:
         <tr><th>项目</th><th>要求</th></tr>
         <tr><td>操作系统</td><td>Windows 10/11（本项目开发环境）</td></tr>
         <tr><td>Python</td><td>3.10+（含venv虚拟环境）</td></tr>
-        <tr><td>大模型运行时</td><td>Ollama（本地部署Qwen2:1.5B）</td></tr>
-        <tr><td>磁盘空间</td><td>模型约934MB + 项目约200MB</td></tr>
+        <tr><td>大模型运行时</td><td>Ollama（本地部署Qwen2.5:3B）</td></tr>
+        <tr><td>磁盘空间</td><td>模型约1.9GB + 项目约200MB</td></tr>
         <tr><td>网络</td><td>首次安装需联网下载模型，运行时完全离线</td></tr>
     </table>
 
@@ -408,7 +408,7 @@ uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
 
     <h3>10.3 Ollama模型配置要点</h3>
     <ul>
-        <li>模型安装：ollama pull qwen2:1.5b（约934MB，支持国内镜像加速）</li>
+        <li>模型安装：ollama pull qwen2.5:3b（约1.9GB，支持国内镜像加速）</li>
         <li>模型目录：可通过环境变量OLLAMA_MODELS指定到非系统盘（如D:\ollama-models）</li>
         <li>模型迁移注意事项：必须整体复制manifests+blobs+metadata目录，任何文件缺失都会导致模型不被识别（见Bug6）</li>
         <li>识别校验：ollama list 或 GET /api/tags 确认模型可见</li>
@@ -423,7 +423,7 @@ uvicorn main:app --reload --port 8000      # 启动服务</code></pre>
         <li>项目代码完整托管于GitHub/Gitee，支持一键克隆复现</li>
     </ul>
     <div class="note">
-        <b>复现步骤摘要：</b>安装Python → 克隆项目 → pip install -r requirements.txt → 安装Ollama并拉取qwen2:1.5b → 运行start.sh → 浏览器访问127.0.0.1:8000
+        <b>复现步骤摘要：</b>安装Python → 克隆项目 → pip install -r requirements.txt → 安装Ollama并拉取qwen2.5:3b → 运行start.sh → 浏览器访问127.0.0.1:8000
     </div>
 
     <h2>12. 安全设计</h2>
