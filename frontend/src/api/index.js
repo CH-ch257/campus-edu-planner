@@ -63,6 +63,7 @@ export const api = {
   deletePublicQa: (id) => request(`/qa/${id}`, { method: 'DELETE' }),
   // 教师公开内容管理
   teacherPublicQa: () => request('/teacher/qa/public/'),
+  teacherQaNote: (id, note) => request(`/teacher/qa/${id}/note`, { method: 'PUT', params: { note } }),
   // 管理员后台
   adminUsers: () => request('/admin/users/'),
   adminCreateTeacher: (username, password) =>

@@ -100,6 +100,7 @@ onMounted(load)
         📎 参考：{{ r.sources.map(s => s.doc_name).join('、') }}
       </div>
       <div v-if="r.note" class="note">📝 {{ r.note }}</div>
+      <div v-if="r.teacher_note" class="teacher-note">👩‍🏫 教师评语：{{ r.teacher_note }}</div>
       <div class="meta">
         <span class="time">{{ r.created_at }}</span>
         <el-tag size="small" :type="permMap[r.permission]?.type || 'info'">{{ permMap[r.permission]?.label }}</el-tag>
@@ -142,4 +143,4 @@ onMounted(load)
 .meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; padding-top: 10px; border-top: 1px dashed #e6f0f8; }
 .time { font-size: 12px; color: #94a3b8; }
 .ops { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-</style>
+.teacher-note { font-size: 13px; color: #047857; margin-top: 10px; background: #d1fae5; padding: 7px 12px; border-radius: 10px; border: 1px solid #a7f3d0; }</style>

@@ -51,6 +51,7 @@ onMounted(load)
       <div class="q"><span class="q-mark">Q</span>{{ r.question }}</div>
       <div class="a"><span class="a-mark">A</span>{{ r.answer }}</div>
       <div v-if="r.note" class="note">📝 {{ r.note }}</div>
+      <div v-if="r.teacher_note" class="teacher-note">👩‍🏫 教师评语：{{ r.teacher_note }}</div>
       <div class="time">{{ r.created_at }}</div>
     </div>
   </el-card>
@@ -77,4 +78,4 @@ onMounted(load)
 .a-mark { background: linear-gradient(135deg, #10b981, #34d399); }
 .a { color: #475569; line-height: 1.75; white-space: pre-wrap; word-break: break-word; font-size: 14px; padding-left: 32px; }
 .note { font-size: 13px; color: #b45309; margin-top: 10px; background: #fef3c7; padding: 7px 12px; border-radius: 10px; border: 1px solid #fde68a; }
-</style>
+.teacher-note { font-size: 13px; color: #047857; margin-top: 10px; background: #d1fae5; padding: 7px 12px; border-radius: 10px; border: 1px solid #a7f3d0; }</style>

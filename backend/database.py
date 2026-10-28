@@ -61,7 +61,8 @@ class QuestionAnswer(Base):
     answer = Column(Text, nullable=False, comment="AI回答")
     sources = Column(Text, comment="引用来源json：[{doc_id, doc_name}]")
     source_doc_ids = Column(Text, comment="引用来源文档id，逗号分隔")
-    note = Column(Text, default="", comment="备注")
+    note = Column(Text, default="", comment="备注（学生自己写）")
+    teacher_note = Column(Text, default="", comment="教师评语（老师对学生公开问答的点评）")
     permission = Column(String(20), default="private", comment="权限：private/link/public")
     share_token = Column(String(32), nullable=True, index=True, comment="分享token")
     created_at = Column(DateTime, default=datetime.now, comment="提问时间")
@@ -102,6 +103,9 @@ def init_db():
         dcols = [r[1] for r in conn.execute(text("PRAGMA table_info(documents)"))]
         if "teacher_id" not in dcols:
             conn.execute(text("ALTER TABLE documents ADD COLUMN teacher_id INTEGER"))
+        qcols = [r[1] for r in conn.execute(text("PRAGMA table_info(qa_records)"))]
+        if "teacher_note" not in qcols:
+            conn.execute(text("ALTER TABLE qa_records ADD COLUMN teacher_note TEXT DEFAULT ''"))
     # 预设固定账号：高级管理员 admin、老师 teacher（仅当不存在时创建，不开放注册）
     db = SessionLocal()
     try:

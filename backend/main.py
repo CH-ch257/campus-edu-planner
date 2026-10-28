@@ -299,6 +299,7 @@ def _qa_to_dict(r):
         "answer": r.answer,
         "sources": json.loads(r.sources) if r.sources else [],
         "note": r.note or "",
+        "teacher_note": r.teacher_note or "",
         "permission": r.permission,
         "share_token": r.share_token,
         "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""
@@ -357,6 +358,7 @@ def qa_share_view(token: str, db: Session = Depends(get_db)):
         "answer": qa.answer,
         "sources": json.loads(qa.sources) if qa.sources else [],
         "note": qa.note or "",
+        "teacher_note": qa.teacher_note or "",
         "owner": owner.username if owner else ""
     }
 
@@ -375,7 +377,8 @@ def user_public_qa(user_id: int, db: Session = Depends(get_db)):
         QuestionAnswer.user_id == user_id, QuestionAnswer.permission == "public"
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
-        {"question": r.question, "answer": r.answer, "note": r.note or "", "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""}
+        {"question": r.question, "answer": r.answer, "note": r.note or "", "teacher_note": r.teacher_note or "",
+         "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""}
         for r in records
     ]
 
@@ -410,6 +413,25 @@ def del_public_qa(qa_id: int, db: Session = Depends(get_db), teacher: User = Dep
     return {"msg": "删除成功"}
 
 
+@app.put("/teacher/qa/{qa_id}/note", summary="【教师】给学生公开问答写评语（仅限本人上传文档关联）")
+def teacher_qa_note(qa_id: int, note: str = Query(...), db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if qa.permission != "public":
+        raise HTTPException(status_code=403, detail="只能给公开问答写评语")
+    doc_ids = [int(x) for x in (qa.source_doc_ids or "").split(",") if x.strip()]
+    if doc_ids:
+        owned = db.query(Document).filter(Document.id.in_(doc_ids), Document.teacher_id == teacher.id).count()
+    else:
+        owned = 0
+    if owned == 0:
+        raise HTTPException(status_code=403, detail="只能给与你上传文档相关的公开问答写评语")
+    qa.teacher_note = note.strip()
+    db.commit()
+    return {"msg": "评语已保存"}
+
+
 @app.get("/teacher/qa/public/", summary="【教师】查看学生公开问答")
 def teacher_public_qa(db: Session = Depends(get_db), teacher: User = Depends(get_current_teacher)):
     rows = db.query(QuestionAnswer, User).join(User, QuestionAnswer.user_id == User.id).filter(
@@ -417,7 +439,8 @@ def teacher_public_qa(db: Session = Depends(get_db), teacher: User = Depends(get
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
         {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
-         "note": qa.note or "", "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
+         "note": qa.note or "", "teacher_note": qa.teacher_note or "",
+         "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
         for qa, u in rows
     ]
 
@@ -429,7 +452,8 @@ def admin_public_qa(db: Session = Depends(get_db), admin: User = Depends(get_cur
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
         {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
-         "note": qa.note or "", "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
+         "note": qa.note or "", "teacher_note": qa.teacher_note or "",
+         "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
         for qa, u in rows
     ]
 

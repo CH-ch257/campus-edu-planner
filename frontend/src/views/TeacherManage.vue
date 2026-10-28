@@ -36,6 +36,21 @@ async function del(row) {
   }
 }
 
+async function noteQa(row) {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '给学生这条问答写评语（学生可见），留空可清除评语：',
+      row.teacher_note ? '修改评语' : '写评语',
+      { inputValue: row.teacher_note || '', inputPlaceholder: '例如：回答得很完整，继续保持！', confirmButtonText: '保存', cancelButtonText: '取消' }
+    )
+    await api.teacherQaNote(row.id, value || '')
+    ElMessage.success('评语已保存')
+    load()
+  } catch (e) {
+    if (e && e.message) ElMessage.error(e.message)
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -59,7 +74,11 @@ onMounted(load)
       <div class="q"><span class="q-mark">Q</span>{{ r.question }}</div>
       <div class="a"><span class="a-mark">A</span>{{ r.answer }}</div>
       <div v-if="r.note" class="note">📝 {{ r.note }}</div>
+      <div v-if="r.teacher_note" class="teacher-note">👩‍🏫 教师评语：{{ r.teacher_note }}</div>
       <div class="ops">
+        <el-button size="small" type="primary" plain @click="noteQa(r)">
+          {{ r.teacher_note ? '改评语' : '写评语' }}
+        </el-button>
         <el-button size="small" type="danger" @click="del(r)">删除</el-button>
       </div>
     </div>
@@ -82,5 +101,7 @@ onMounted(load)
 .a-mark { background: linear-gradient(135deg, #10b981, #34d399); }
 .a { color: #475569; line-height: 1.75; white-space: pre-wrap; word-break: break-word; font-size: 14px; padding-left: 32px; }
 .note { font-size: 13px; color: #b45309; margin-top: 10px; background: #fef3c7; padding: 7px 12px; border-radius: 10px; border: 1px solid #fde68a; }
+.teacher-note { font-size: 13px; color: #047857; margin-top: 10px; background: #d1fae5; padding: 7px 12px; border-radius: 10px; border: 1px solid #a7f3d0; }
 .ops { margin-top: 12px; text-align: right; }
+.ops .el-button + .el-button { margin-left: 8px; }
 </style>
