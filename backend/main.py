@@ -14,10 +14,12 @@ from database import (
     init_db, get_db, save_document, list_documents,
     get_document_by_id,
     extract_text_from_pdf, extract_text_from_word, extract_text_from_txt,
-    UPLOAD_DIR, Document, User, QuestionAnswer
+    UPLOAD_DIR, Document, User, QuestionAnswer, QaNote
 )
 from rag import save_chunks_to_db, search_top3_chunks
 from llm import chat_with_llm, chat_stream, classify_document
+
+QA_NOTES_LIMIT = 10  # 每条问答允许的追加备注上限（避免备注过多）
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -291,7 +293,7 @@ def _save_qa(db, user_id, question, answer, srcs, doc_ids):
     return qa
 
 
-def _qa_to_dict(r):
+def _qa_to_dict(r, db: Session):
     """问答记录序列化（登录用户自己的历史）"""
     return {
         "id": r.id,
@@ -299,11 +301,24 @@ def _qa_to_dict(r):
         "answer": r.answer,
         "sources": json.loads(r.sources) if r.sources else [],
         "note": r.note or "",
+        "notes": _qa_notes(r.id, db),
         "teacher_note": r.teacher_note or "",
         "permission": r.permission,
         "share_token": r.share_token,
         "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""
     }
+
+
+def _qa_notes(qa_id: int, db: Session):
+    """读取某条问答的追加备注列表（含添加者用户名），按时间正序"""
+    rows = db.query(QaNote, User).join(User, QaNote.user_id == User.id).filter(
+        QaNote.qa_id == qa_id
+    ).order_by(QaNote.created_at.asc()).all()
+    return [
+        {"user_id": u.id, "username": u.username, "content": n.content,
+         "created_at": n.created_at.strftime("%Y-%m-%d %H:%M") if n.created_at else ""}
+        for n, u in rows
+    ]
 
 
 @app.get("/qa/history/", summary="我的问答历史（支持搜索）")
@@ -312,7 +327,7 @@ def qa_history(keyword: str = Query(None), db: Session = Depends(get_db), curren
     if keyword:
         q = q.filter(QuestionAnswer.question.contains(keyword) | QuestionAnswer.answer.contains(keyword))
     records = q.order_by(QuestionAnswer.created_at.desc()).all()
-    return [_qa_to_dict(r) for r in records]
+    return [_qa_to_dict(r, db) for r in records]
 
 
 @app.get("/qa/public/", summary="公开问答广场（登录用户可浏览全部公开问答）")
@@ -328,6 +343,7 @@ def qa_public_square(db: Session = Depends(get_db), current_user: User = Depends
             "question": qa.question,
             "answer": qa.answer,
             "note": qa.note or "",
+            "notes": _qa_notes(qa.id, db),
             "teacher_note": qa.teacher_note or "",
             "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else "",
         }
@@ -343,6 +359,25 @@ def qa_note(qa_id: int, note: str = Query(""), db: Session = Depends(get_db), cu
     qa.note = note
     db.commit()
     return {"msg": "备注已保存"}
+
+
+@app.post("/qa/{qa_id}/notes", summary="给公开问答追加备注（登录学生可加，多条追加不覆盖）")
+def qa_add_note(qa_id: int, content: str = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    content = content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="备注内容不能为空")
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if qa.permission != "public":
+        raise HTTPException(status_code=403, detail="只能给公开问答追加备注")
+    # 备注上限：旧备注 note + 追加备注 qa_notes 合计不超过上限
+    total = (1 if qa.note else 0) + db.query(QaNote).filter(QaNote.qa_id == qa_id).count()
+    if total >= QA_NOTES_LIMIT:
+        raise HTTPException(status_code=400, detail=f"该问答备注已达上限（{QA_NOTES_LIMIT}条），请勿继续添加")
+    db.add(QaNote(qa_id=qa_id, user_id=current_user.id, content=content))
+    db.commit()
+    return {"msg": "备注已添加", "total": total + 1}
 
 
 @app.put("/qa/{qa_id}/permission", summary="修改问答权限")
@@ -378,6 +413,7 @@ def qa_share_view(token: str, db: Session = Depends(get_db)):
         "answer": qa.answer,
         "sources": json.loads(qa.sources) if qa.sources else [],
         "note": qa.note or "",
+        "notes": _qa_notes(qa.id, db),
         "teacher_note": qa.teacher_note or "",
         "owner": owner.username if owner else ""
     }
@@ -397,7 +433,8 @@ def user_public_qa(user_id: int, db: Session = Depends(get_db)):
         QuestionAnswer.user_id == user_id, QuestionAnswer.permission == "public"
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
-        {"question": r.question, "answer": r.answer, "note": r.note or "", "teacher_note": r.teacher_note or "",
+        {"question": r.question, "answer": r.answer, "note": r.note or "", "notes": _qa_notes(r.id, db),
+         "teacher_note": r.teacher_note or "",
          "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""}
         for r in records
     ]
@@ -428,6 +465,7 @@ def del_public_qa(qa_id: int, db: Session = Depends(get_db), teacher: User = Dep
         owned = 0
     if owned == 0:
         raise HTTPException(status_code=403, detail="只能删除与你上传文档相关的公开问答")
+    db.query(QaNote).filter(QaNote.qa_id == qa_id).delete()
     db.delete(qa)
     db.commit()
     return {"msg": "删除成功"}
@@ -459,7 +497,7 @@ def teacher_public_qa(db: Session = Depends(get_db), teacher: User = Depends(get
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
         {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
-         "note": qa.note or "", "teacher_note": qa.teacher_note or "",
+         "note": qa.note or "", "notes": _qa_notes(qa.id, db), "teacher_note": qa.teacher_note or "",
          "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
         for qa, u in rows
     ]
@@ -472,7 +510,7 @@ def admin_public_qa(db: Session = Depends(get_db), admin: User = Depends(get_cur
     ).order_by(QuestionAnswer.created_at.desc()).all()
     return [
         {"id": qa.id, "username": u.username, "question": qa.question, "answer": qa.answer,
-         "note": qa.note or "", "teacher_note": qa.teacher_note or "",
+         "note": qa.note or "", "notes": _qa_notes(qa.id, db), "teacher_note": qa.teacher_note or "",
          "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else ""}
         for qa, u in rows
     ]
@@ -485,6 +523,7 @@ def admin_del_public_qa(qa_id: int, db: Session = Depends(get_db), admin: User =
         raise HTTPException(status_code=404, detail="问答记录不存在")
     if qa.permission != "public":
         raise HTTPException(status_code=403, detail="只能删除公开问答")
+    db.query(QaNote).filter(QaNote.qa_id == qa_id).delete()
     db.delete(qa)
     db.commit()
     return {"msg": "删除成功"}
@@ -525,8 +564,11 @@ def admin_delete_user(user_id: int, db: Session = Depends(get_db), admin: User =
         raise HTTPException(status_code=400, detail="不能删除自己的账号")
     if u.role == "admin":
         raise HTTPException(status_code=400, detail="不能删除高级管理员账号")
-    # 级联清理：该用户上传的文档 + 该用户的所有问答记录
+    # 级联清理：该用户上传的文档 + 该用户的所有问答记录及其追加备注
     db.query(Document).filter(Document.teacher_id == user_id).delete(synchronize_session=False)
+    qa_ids = [r.id for r in db.query(QuestionAnswer.id).filter(QuestionAnswer.user_id == user_id).all()]
+    if qa_ids:
+        db.query(QaNote).filter(QaNote.qa_id.in_(qa_ids)).delete(synchronize_session=False)
     db.query(QuestionAnswer).filter(QuestionAnswer.user_id == user_id).delete(synchronize_session=False)
     db.delete(u)
     db.commit()

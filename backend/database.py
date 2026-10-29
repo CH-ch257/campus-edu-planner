@@ -61,11 +61,21 @@ class QuestionAnswer(Base):
     answer = Column(Text, nullable=False, comment="AI回答")
     sources = Column(Text, comment="引用来源json：[{doc_id, doc_name}]")
     source_doc_ids = Column(Text, comment="引用来源文档id，逗号分隔")
-    note = Column(Text, default="", comment="备注（学生自己写）")
+    note = Column(Text, default="", comment="备注（学生自己写，兼容旧版单条）")
     teacher_note = Column(Text, default="", comment="教师评语（老师对学生公开问答的点评）")
     permission = Column(String(20), default="private", comment="权限：private/link/public")
     share_token = Column(String(32), nullable=True, index=True, comment="分享token")
     created_at = Column(DateTime, default=datetime.now, comment="提问时间")
+
+class QaNote(Base):
+    """问答追加备注表：学生在公开问答上追加的多条备注（不是覆盖，可多条）"""
+    __tablename__ = "qa_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    qa_id = Column(Integer, nullable=False, index=True, comment="关联qa_records.id")
+    user_id = Column(Integer, nullable=False, index=True, comment="添加备注的学生id")
+    content = Column(Text, nullable=False, comment="备注内容")
+    created_at = Column(DateTime, default=datetime.now, comment="添加时间")
 
 class User(Base):
     """用户表：注册/登录账号"""

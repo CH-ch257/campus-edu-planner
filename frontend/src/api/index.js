@@ -54,6 +54,7 @@ export const api = {
   qaHistory: (keyword) => request('/qa/history/', { params: { keyword } }),
   publicQa: () => request('/qa/public/'),
   qaNote: (id, note) => request(`/qa/${id}/note`, { method: 'PUT', params: { note } }),
+  qaAddNote: (id, content) => request(`/qa/${id}/notes`, { method: 'POST', params: { content } }),
   qaPermission: (id, permission) => request(`/qa/${id}/permission`, { method: 'PUT', params: { permission } }),
   qaShare: (id) => request(`/qa/${id}/share`, { method: 'POST' }),
   qaShareView: (token) => request(`/qa/share/${token}`),

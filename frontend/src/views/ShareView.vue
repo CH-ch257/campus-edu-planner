@@ -30,6 +30,14 @@ onMounted(async () => {
         <div class="q"><span class="q-mark">Q</span>{{ data.question }}</div>
         <div class="a"><span class="a-mark">A</span>{{ data.answer }}</div>
         <div v-if="data.note" class="note">📝 {{ data.note }}</div>
+        <div v-if="data.notes && data.notes.length" class="notes-box">
+          <div class="notes-title">📌 追加备注（{{ data.notes.length }} 条）</div>
+          <div v-for="(n, i) in data.notes" :key="i" class="note-row">
+            <span class="note-author">{{ n.username }}</span>
+            <span class="note-content">{{ n.content }}</span>
+            <span class="note-time">{{ n.created_at }}</span>
+          </div>
+        </div>
         <div v-if="data.teacher_note" class="teacher-note">👩‍🏫 教师评语：{{ data.teacher_note }}</div>
         <div v-if="data.sources && data.sources.length" class="src">
           📎 参考：{{ data.sources.map(s => s.doc_name).join('、') }}
@@ -61,4 +69,11 @@ onMounted(async () => {
 .a-mark { background: linear-gradient(135deg, #10b981, #34d399); }
 .a { color: #475569; line-height: 1.75; white-space: pre-wrap; word-break: break-word; font-size: 14px; padding-left: 32px; }
 .note { font-size: 13px; color: #b45309; margin-top: 10px; background: #fef3c7; padding: 7px 12px; border-radius: 10px; border: 1px solid #fde68a; }
+.notes-box { margin-top: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 10px 14px; }
+.notes-title { font-size: 12px; font-weight: 700; color: #0369a1; margin-bottom: 8px; }
+.note-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; border-top: 1px dashed #bae6fd; font-size: 13px; }
+.note-row:first-of-type { border-top: none; }
+.note-author { font-weight: 600; color: #0ea5e9; flex-shrink: 0; }
+.note-content { color: #334155; flex: 1; }
+.note-time { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
 .teacher-note { font-size: 13px; color: #047857; margin-top: 10px; background: #d1fae5; padding: 7px 12px; border-radius: 10px; border: 1px solid #a7f3d0; }</style>
