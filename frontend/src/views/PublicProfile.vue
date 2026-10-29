@@ -32,7 +32,7 @@ onMounted(async () => {
 
 <template>
   <div class="pub-wrap">
-    <div class="back-row"><el-button size="small" text @click="goBack">← 返回</el-button></div>
+    <div class="back-row"><button class="back-btn" @click="goBack"><span class="arr">←</span> 返回</button></div>
     <div class="brand"><span class="logo">✦</span>校园资料AI检索助手</div>
     <el-card shadow="never" class="card">
       <div v-if="loading" class="empty">加载中…</div>
@@ -65,7 +65,10 @@ onMounted(async () => {
 
 <style scoped>
 .pub-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; background: linear-gradient(135deg, #e0f2fe, #ecfeff); }
-.back-row { width: 100%; max-width: 720px; margin-bottom: 4px; }
+.back-row { width: 100%; max-width: 720px; margin-bottom: 6px; }
+.back-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; border-radius: 999px; padding: 6px 16px; font-size: 13px; cursor: pointer; transition: all .2s ease; font-family: inherit; }
+.back-btn:hover { background: #e0f2fe; border-color: #0ea5e9; transform: translateX(-2px); }
+.back-btn .arr { font-size: 14px; line-height: 1; }
 .brand { display: flex; align-items: center; font-weight: 700; font-size: 16px; color: #1e293b; margin-bottom: 20px; }
 .brand .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #0ea5e9, #10b981); color: #fff; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 17px; }
 .card { width: 100%; max-width: 720px; border-radius: 18px; border: 1px solid #e2ecf5; box-shadow: 0 10px 30px rgba(14,165,233,.08); }
