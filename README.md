@@ -42,7 +42,7 @@
 | 后端 | fastapi / uvicorn | Web 服务框架与 ASGI 服务器 |
 | 后端 | sqlalchemy | ORM 数据库访问（SQLite） |
 | 后端 | openai | 调用本地 Ollama（OpenAI 兼容协议） |
-| 后端 | sentence-transformers | 中文向量模型加载与编码（bge-small-zh-v1.5） |
+| 后端 | sentence-transformers | 中文向量模型加载与编码（bge-small-zh-v1.5，模型已内置 backend/models/） |
 | 后端 | PyMuPDF / python-docx | PDF / Word 文档文本提取 |
 | 前端 | Vue3 / Vite / Pinia / Vue Router / Element Plus | 前端工程（见 frontend/package.json） |
 | 系统 | Ollama + qwen2.5:3b | 本地大模型推理（约 1.9GB） |
@@ -76,7 +76,7 @@ export HF_ENDPOINT=https://hf-mirror.com
    venv\Scripts\activate        # Windows；Linux/macOS: source venv/bin/activate
    pip install -r requirements.txt
    ```
-4. **预下载向量模型**（约 90MB）：首次启动后端时会自动下载 BAAI/bge-small-zh-v1.5，建议评审前先启动一次完成下载。
+4. **向量模型已内置**：中文向量模型 bge-small-zh-v1.5（约 92MB）随项目存放在 `backend/models/`，无需下载，首次启动后端自动加载。
 
 ### 2. 10 分钟复现（评审计时路径，实际约 5 分钟）
 

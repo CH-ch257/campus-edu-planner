@@ -3,12 +3,13 @@ RAG向量检索模块：文本分块、向量生成、相似度检索
 """
 import sqlite3
 import json
+import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-# 加载中文向量模型（BAAI官方正确仓库名）
+# 加载中文向量模型（本地离线路径，无需联网下载；模型随项目存放于 backend/models/）
 print("正在加载向量模型，请稍等...")
-model = SentenceTransformer("BAAI/bge-small-zh-v1.5")
+model = SentenceTransformer(os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "bge-small-zh-v1.5"))
 print("✅ 向量模型加载完成")
 
 
