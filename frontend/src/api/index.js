@@ -52,6 +52,7 @@ export const api = {
   me: () => request('/me/'),
   // 问答历史 / 备注 / 权限 / 分享
   qaHistory: (keyword) => request('/qa/history/', { params: { keyword } }),
+  publicQa: () => request('/qa/public/'),
   qaNote: (id, note) => request(`/qa/${id}/note`, { method: 'PUT', params: { note } }),
   qaPermission: (id, permission) => request(`/qa/${id}/permission`, { method: 'PUT', params: { permission } }),
   qaShare: (id) => request(`/qa/${id}/share`, { method: 'POST' }),

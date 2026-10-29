@@ -315,6 +315,26 @@ def qa_history(keyword: str = Query(None), db: Session = Depends(get_db), curren
     return [_qa_to_dict(r) for r in records]
 
 
+@app.get("/qa/public/", summary="公开问答广场（登录用户可浏览全部公开问答）")
+def qa_public_square(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rows = db.query(QuestionAnswer, User).join(User, QuestionAnswer.user_id == User.id).filter(
+        QuestionAnswer.permission == "public"
+    ).order_by(QuestionAnswer.created_at.desc()).all()
+    return [
+        {
+            "id": qa.id,
+            "user_id": u.id,
+            "username": u.username,
+            "question": qa.question,
+            "answer": qa.answer,
+            "note": qa.note or "",
+            "teacher_note": qa.teacher_note or "",
+            "created_at": qa.created_at.strftime("%Y-%m-%d %H:%M") if qa.created_at else "",
+        }
+        for qa, u in rows
+    ]
+
+
 @app.put("/qa/{qa_id}/note", summary="给问答记录写备注")
 def qa_note(qa_id: int, note: str = Query(""), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()

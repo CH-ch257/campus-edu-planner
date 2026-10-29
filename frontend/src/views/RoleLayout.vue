@@ -12,6 +12,7 @@ const roleLabel = { student: '学生', teacher: '老师', admin: '高级管理�
 const menus = computed(() => {
   if (user.role === 'student') return [
     { path: '/student', label: 'AI 问答' },
+    { path: '/student/square', label: '问答广场' },
     { path: '/student/history', label: '问答历史' },
     { path: '/student/profile', label: '个人主页' },
     { path: '/student/settings', label: '个人设置' }

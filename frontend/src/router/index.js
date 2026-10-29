@@ -10,6 +10,7 @@ const routes = [
     meta: { requiresAuth: true, roles: ['student'] },
     children: [
       { path: '', name: 'student-home', component: () => import('../views/AiChat.vue'), meta: { title: 'AI 问答' } },
+      { path: 'square', name: 'student-square', component: () => import('../views/PublicSquare.vue'), meta: { title: '问答广场' } },
       { path: 'history', name: 'student-history', component: () => import('../views/History.vue'), meta: { title: '问答历史' } },
       { path: 'profile', name: 'student-profile', component: () => import('../views/Profile.vue'), meta: { title: '个人主页' } },
       { path: 'settings', name: 'student-settings', component: () => import('../views/Settings.vue'), meta: { title: '个人设置' } }
