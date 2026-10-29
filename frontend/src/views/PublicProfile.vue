@@ -1,13 +1,22 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 
 const route = useRoute()
+const router = useRouter()
 const profile = ref(null)
 const list = ref([])
 const error = ref('')
 const loading = ref(true)
+
+function goBack() {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/login')
+  }
+}
 
 onMounted(async () => {
   try {
@@ -23,6 +32,7 @@ onMounted(async () => {
 
 <template>
   <div class="pub-wrap">
+    <div class="back-row"><el-button size="small" text @click="goBack">← 返回</el-button></div>
     <div class="brand"><span class="logo">✦</span>校园资料AI检索助手</div>
     <el-card shadow="never" class="card">
       <div v-if="loading" class="empty">加载中…</div>
@@ -55,6 +65,7 @@ onMounted(async () => {
 
 <style scoped>
 .pub-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; background: linear-gradient(135deg, #e0f2fe, #ecfeff); }
+.back-row { width: 100%; max-width: 720px; margin-bottom: 4px; }
 .brand { display: flex; align-items: center; font-weight: 700; font-size: 16px; color: #1e293b; margin-bottom: 20px; }
 .brand .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #0ea5e9, #10b981); color: #fff; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 17px; }
 .card { width: 100%; max-width: 720px; border-radius: 18px; border: 1px solid #e2ecf5; box-shadow: 0 10px 30px rgba(14,165,233,.08); }
