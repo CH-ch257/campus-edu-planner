@@ -5,6 +5,7 @@ import os
 import uuid
 import json
 import hashlib
+import socket
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Header
 from fastapi.responses import FileResponse, StreamingResponse
@@ -114,6 +115,23 @@ def get_current_admin(current_user: User = Depends(get_current_user)):
 @app.get("/me/", summary="获取当前登录用户信息")
 def me(current_user: User = Depends(get_current_user)):
     return {"user_id": current_user.id, "username": current_user.username, "role": current_user.role}
+
+
+def _local_ip():
+    """获取本机局域网IP（UDP连接不真正发包，仅用于选路）"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+@app.get("/local-ip/", summary="获取本机局域网IP（用于生成跨设备可访问的分享链接）")
+def local_ip():
+    return {"ip": _local_ip()}
 
 
 @app.post("/upload/", summary="【教师专用】上传文档")

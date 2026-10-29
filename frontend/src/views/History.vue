@@ -97,7 +97,14 @@ async function share(row) {
   }
   try {
     const data = await api.qaShare(row.id)
-    const url = `${window.location.origin}/share/${data.share_token}`
+    // 本机(localhost)访问时链接对他人无效：改用局域网IP拼链接，手机/同WiFi设备才能打开
+    let base = window.location.origin
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') {
+      const { ip } = await api.localIp()
+      base = `http://${ip}:${window.location.port || '5173'}`
+    }
+    const url = `${base}/share/${data.share_token}`
     try {
       await navigator.clipboard.writeText(url)
       ElMessage.success('分享链接已复制')

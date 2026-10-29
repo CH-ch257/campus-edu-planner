@@ -14,6 +14,7 @@ export default defineConfig({
       '/file': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/static': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/me': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/local-ip': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/change_password': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/users/': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/teacher/qa': { target: 'http://127.0.0.1:8000', changeOrigin: true },

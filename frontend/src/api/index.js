@@ -50,6 +50,7 @@ export const api = {
   login: (username, password) => request('/login/', { method: 'POST', params: { username, password } }),
   register: (username, password) => request('/register/', { method: 'POST', params: { username, password } }),
   me: () => request('/me/'),
+  localIp: () => request('/local-ip/'),
   // 问答历史 / 备注 / 权限 / 分享
   qaHistory: (keyword) => request('/qa/history/', { params: { keyword } }),
   publicQa: () => request('/qa/public/'),
