@@ -306,6 +306,15 @@ if old:
         <p><b>说明：</b>返回分享token，供落地页 /qa/share/{token} 使用（免登录）</p>
     </div>
     <div class="api-card">
+        <h4><span class="tag green">GET</span>/qa/public/ — 问答广场（公开问答聚合浏览）</h4>
+        <p><b>鉴权：</b>Bearer Token（登录学生/教师均可）；联查 users 表按提问时间倒序返回全部公开问答，携带提问者用户名、备注、追加备注列表（qa_notes）与教师评语</p>
+    </div>
+    <div class="api-card">
+        <h4><span class="tag">POST</span>/qa/{qa_id}/notes — 追加备注（多条追加，不覆盖）</h4>
+        <p><b>鉴权：</b>Bearer Token（登录学生）；参数：content（非空校验，前端限200字）</p>
+        <p><b>说明：</b>仅可给公开问答追加备注；每次调用新增一条 qa_notes 记录，不覆盖旧备注；备注总量（旧note + qa_notes）达上限 QA_NOTES_LIMIT=10 时返回 400"该问答备注已达上限（10条）"</p>
+    </div>
+    <div class="api-card">
         <h4><span class="tag green">GET</span>/users/{id}/profile 与 /users/{id}/qa_public — 个人主页</h4>
         <p><b>说明：</b>免登录查看用户公开信息与其公开问答列表</p>
     </div>
@@ -498,6 +507,10 @@ if old:
         <tr><td>T23</td><td>流式问答输出</td><td>学生提问后观察回答呈现</td><td>打字机逐字输出，首字2-3秒可见，回答完整落库留痕</td><td>✅ 通过</td></tr>
         <tr><td>T24</td><td>教师写评语</td><td>教师对自己文档关联的公开问答写评语</td><td>评语保存；学生历史/主页/分享页可见；无关问答403</td><td>✅ 通过</td></tr>
         <tr><td>T25</td><td>用户删除级联清理</td><td>管理员删除老师账号后检查其文档与问答</td><td>账号删除后其上传文档与问答记录一并清理</td><td>✅ 通过</td></tr>
+        <tr><td>T26</td><td>问答广场浏览</td><td>学生登录进入「问答广场」</td><td>展示全校公开问答（提问者名字可点进主页，含教师评语）</td><td>✅ 通过</td></tr>
+        <tr><td>T27</td><td>追加备注</td><td>学生A对他人公开问答追加备注</td><td>新增一条备注（不覆盖旧备注），列表显示添加者/内容/时间</td><td>✅ 通过</td></tr>
+        <tr><td>T28</td><td>备注上限拦截</td><td>同一问答连加11条备注</td><td>前10条成功，第11条返回400"已达上限（10条）"</td><td>✅ 通过</td></tr>
+        <tr><td>T29</td><td>教师删除带备注问答</td><td>教师删除备注已满的关联公开问答</td><td>整条问答删除，其全部追加备注级联清空</td><td>✅ 通过</td></tr>
     </table>
 
     <h3>9.2 异常场景验证</h3>
@@ -514,6 +527,9 @@ if old:
         <tr><td>E09</td><td>修改权限非法值</td><td>提交权限为其他字符串</td><td>校验拒绝，保持原权限</td><td>✅ 通过</td></tr>
         <tr><td>E10</td><td>管理员删除保护账号</td><td>管理员删除自己或admin角色</td><td>返回400"不能删除自己的账号"</td><td>✅ 通过</td></tr>
         <tr><td>E11</td><td>SSE流式连接中断</td><td>生成过程中前端断开</td><td>后端结束流并保存已生成内容，前端恢复后可见</td><td>✅ 通过</td></tr>
+        <tr><td>E12</td><td>备注超上限提交</td><td>备注已达10条后再次追加</td><td>返回400"该问答备注已达上限（10条）"，不写入</td><td>✅ 通过</td></tr>
+        <tr><td>E13</td><td>给私有问答追加备注</td><td>学生向非公开问答提交追加备注</td><td>返回403"只能给公开问答追加备注"</td><td>✅ 通过</td></tr>
+        <tr><td>E14</td><td>空备注内容</td><td>提交空白备注内容</td><td>返回400"备注内容不能为空"</td><td>✅ 通过</td></tr>
     </table>
 
     <h2>10. 部署与运行说明</h2>
