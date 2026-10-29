@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
 import { useUserStore } from '../stores/user'
+import { shareBase } from '../utils/shareBase'
 
 const user = useUserStore()
 const list = ref([])
@@ -20,7 +21,7 @@ async function load() {
 }
 
 async function copyProfile() {
-  const url = `${window.location.origin}/u/${user.userId}`
+  const url = `${await shareBase()}/u/${user.userId}`
   try {
     await navigator.clipboard.writeText(url)
     ElMessage.success('主页链接已复制')
