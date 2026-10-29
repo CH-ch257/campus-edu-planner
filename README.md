@@ -35,6 +35,31 @@
 - Node.js 18+
 - 已安装 [Ollama](https://ollama.com/download)
 
+### 0.5 依赖清单
+
+| 类别 | 依赖 | 用途 |
+|---|---|---|
+| 后端 | fastapi / uvicorn | Web 服务框架与 ASGI 服务器 |
+| 后端 | sqlalchemy | ORM 数据库访问（SQLite） |
+| 后端 | openai | 调用本地 Ollama（OpenAI 兼容协议） |
+| 后端 | sentence-transformers | 中文向量模型加载与编码（bge-small-zh-v1.5） |
+| 后端 | PyMuPDF / python-docx | PDF / Word 文档文本提取 |
+| 前端 | Vue3 / Vite / Pinia / Vue Router / Element Plus | 前端工程（见 frontend/package.json） |
+| 系统 | Ollama + qwen2.5:3b | 本地大模型推理（约 1.9GB） |
+
+### 0.6 环境变量模板
+
+项目仅需一个可选环境变量（国内网络拉取向量模型时使用；海外可跳过）：
+
+```bash
+# 国内网络拉取 HuggingFace 模型走镜像（Windows PowerShell 写法见下）
+export HF_ENDPOINT=https://hf-mirror.com
+# Windows PowerShell:
+# $env:HF_ENDPOINT="https://hf-mirror.com"
+```
+
+后端默认监听 `0.0.0.0:8000`（FastAPI），前端默认 `localhost:5173`（Vite），无需额外环境变量即可运行；若需改端口，在启动命令中追加 `--port` 参数即可。
+
 ### 1. 克隆仓库
 
 ```bash
