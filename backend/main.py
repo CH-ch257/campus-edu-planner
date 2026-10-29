@@ -305,6 +305,8 @@ def _qa_to_dict(r, db: Session):
         "teacher_note": r.teacher_note or "",
         "permission": r.permission,
         "share_token": r.share_token,
+        "is_favorite": r.is_favorite or 0,
+        "is_pinned": r.is_pinned or 0,
         "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""
     }
 
@@ -326,8 +328,45 @@ def qa_history(keyword: str = Query(None), db: Session = Depends(get_db), curren
     q = db.query(QuestionAnswer).filter(QuestionAnswer.user_id == current_user.id)
     if keyword:
         q = q.filter(QuestionAnswer.question.contains(keyword) | QuestionAnswer.answer.contains(keyword))
-    records = q.order_by(QuestionAnswer.created_at.desc()).all()
+    records = q.order_by(QuestionAnswer.is_pinned.desc(), QuestionAnswer.created_at.desc()).all()
     return [_qa_to_dict(r, db) for r in records]
+
+
+@app.delete("/qa/{qa_id}/mine", summary="删除自己的问答记录（级联清理备注，分享链接失效）")
+def qa_delete_mine(qa_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    db.query(QaNote).filter(QaNote.qa_id == qa_id).delete()
+    db.delete(qa)
+    db.commit()
+    return {"msg": "问答记录已删除"}
+
+
+@app.put("/qa/{qa_id}/favorite", summary="收藏/取消收藏自己的问答记录")
+def qa_favorite(qa_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    qa.is_favorite = 0 if (qa.is_favorite or 0) else 1
+    db.commit()
+    return {"msg": "已收藏" if qa.is_favorite else "已取消收藏", "is_favorite": qa.is_favorite}
+
+
+@app.put("/qa/{qa_id}/pin", summary="置顶/取消置顶自己的问答记录（最多5条置顶）")
+def qa_pin(qa_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id, QuestionAnswer.user_id == current_user.id).first()
+    if not qa:
+        raise HTTPException(status_code=404, detail="问答记录不存在")
+    if not (qa.is_pinned or 0):
+        pinned_count = db.query(QuestionAnswer).filter(
+            QuestionAnswer.user_id == current_user.id, QuestionAnswer.is_pinned == 1
+        ).count()
+        if pinned_count >= 5:
+            raise HTTPException(status_code=400, detail="置顶最多5条，请先取消其他置顶")
+    qa.is_pinned = 0 if (qa.is_pinned or 0) else 1
+    db.commit()
+    return {"msg": "已置顶" if qa.is_pinned else "已取消置顶", "is_pinned": qa.is_pinned}
 
 
 @app.get("/qa/public/", summary="公开问答广场（登录用户可浏览全部公开问答）")

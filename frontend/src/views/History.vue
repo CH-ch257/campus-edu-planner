@@ -6,6 +6,7 @@ import { api } from '../api'
 const list = ref([])
 const keyword = ref('')
 const loading = ref(false)
+const favoriteOnly = ref(false)
 
 const permMap = {
   private: { label: '私有', type: 'info' },
@@ -16,7 +17,8 @@ const permMap = {
 async function load() {
   loading.value = true
   try {
-    list.value = await api.qaHistory(keyword.value.trim() || undefined)
+    const data = await api.qaHistory(keyword.value.trim() || undefined)
+    list.value = favoriteOnly.value ? data.filter((r) => r.is_favorite) : data
   } catch (e) {
     ElMessage.error(e.message)
   } finally {
@@ -26,6 +28,41 @@ async function load() {
 
 function search() {
   load()
+}
+
+async function toggleFavorite(row) {
+  try {
+    await api.qaFavorite(row.id)
+    ElMessage.success(row.is_favorite ? '已取消收藏' : '已收藏')
+    load()
+  } catch (e) {
+    ElMessage.error(e.message)
+  }
+}
+
+async function togglePin(row) {
+  try {
+    await api.qaPin(row.id)
+    ElMessage.success(row.is_pinned ? '已取消置顶' : '已置顶')
+    load()
+  } catch (e) {
+    ElMessage.error(e.message)
+  }
+}
+
+async function delMine(row) {
+  try {
+    await ElMessageBox.confirm(
+      `删除后该记录及其备注将永久清除，分享链接也会失效，确定删除这条问答吗？`,
+      '删除问答记录',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+    await api.qaDeleteMine(row.id)
+    ElMessage.success('已删除')
+    load()
+  } catch (e) {
+    if (e && e.message) ElMessage.error(e.message)
+  }
 }
 
 async function editNote(row) {
@@ -86,6 +123,7 @@ onMounted(load)
         <div class="search">
           <el-input v-model="keyword" placeholder="搜索问题或回答..." clearable @keyup.enter="search" @clear="search" />
           <el-button type="primary" @click="search">搜索</el-button>
+          <el-checkbox v-model="favoriteOnly" @change="load">只看收藏</el-checkbox>
         </div>
       </div>
     </template>
@@ -110,6 +148,7 @@ onMounted(load)
       </div>
       <div v-if="r.teacher_note" class="teacher-note">👩‍🏫 教师评语：{{ r.teacher_note }}</div>
       <div class="meta">
+        <span v-if="r.is_pinned" class="pin-mark">📌 已置顶</span>
         <span class="time">{{ r.created_at }}</span>
         <el-tag size="small" :type="permMap[r.permission]?.type || 'info'">{{ permMap[r.permission]?.label }}</el-tag>
         <div class="ops">
@@ -120,6 +159,13 @@ onMounted(load)
           </el-select>
           <el-button size="small" @click="editNote(r)">写备注</el-button>
           <el-button size="small" type="primary" @click="share(r)">分享链接</el-button>
+          <el-button size="small" :type="r.is_favorite ? 'warning' : 'default'" @click="toggleFavorite(r)">
+            {{ r.is_favorite ? '★ 已收藏' : '☆ 收藏' }}
+          </el-button>
+          <el-button size="small" :type="r.is_pinned ? 'warning' : 'default'" @click="togglePin(r)">
+            {{ r.is_pinned ? '📌 已置顶' : '置顶' }}
+          </el-button>
+          <el-button size="small" type="danger" plain @click="delMine(r)">删除</el-button>
         </div>
       </div>
     </div>
@@ -130,7 +176,8 @@ onMounted(load)
 .head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .head-title { display: flex; align-items: center; font-weight: 700; }
 .head-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #0ea5e9, #10b981); margin-right: 10px; box-shadow: 0 0 0 3px rgba(14,165,233,.15); }
-.search { display: flex; gap: 8px; width: 320px; }
+.search { display: flex; gap: 8px; width: 360px; align-items: center; }
+.pin-mark { font-size: 12px; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 8px; }
 .qa-item {
   padding: 18px 20px; border: 1px solid #e6f0f8; border-radius: 14px; margin-bottom: 14px;
   background: #fff; box-shadow: 0 2px 10px rgba(15,118,110,.05);

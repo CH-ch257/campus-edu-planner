@@ -65,6 +65,8 @@ class QuestionAnswer(Base):
     teacher_note = Column(Text, default="", comment="教师评语（老师对学生公开问答的点评）")
     permission = Column(String(20), default="private", comment="权限：private/link/public")
     share_token = Column(String(32), nullable=True, index=True, comment="分享token")
+    is_favorite = Column(Integer, default=0, comment="收藏标记 0/1")
+    is_pinned = Column(Integer, default=0, comment="置顶标记 0/1")
     created_at = Column(DateTime, default=datetime.now, comment="提问时间")
 
 class QaNote(Base):
@@ -116,6 +118,10 @@ def init_db():
         qcols = [r[1] for r in conn.execute(text("PRAGMA table_info(qa_records)"))]
         if "teacher_note" not in qcols:
             conn.execute(text("ALTER TABLE qa_records ADD COLUMN teacher_note TEXT DEFAULT ''"))
+        if "is_favorite" not in qcols:
+            conn.execute(text("ALTER TABLE qa_records ADD COLUMN is_favorite INTEGER DEFAULT 0"))
+        if "is_pinned" not in qcols:
+            conn.execute(text("ALTER TABLE qa_records ADD COLUMN is_pinned INTEGER DEFAULT 0"))
     # 预设固定账号：高级管理员 admin、老师 teacher（仅当不存在时创建，不开放注册）
     db = SessionLocal()
     try:
