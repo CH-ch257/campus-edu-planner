@@ -458,6 +458,8 @@ if old:
     <img src="images/jietu-vue-studentqa.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
     <p style="margin:4px 0 0 0"><b>问答历史页（自动留痕、备注、三档权限、生成分享链接）</b></p>
     <img src="images/jietu-vue-history.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
+    <p style="margin:4px 0 0 0"><b>问答广场（学生端公开问答聚合浏览入口，可对公开问答追加备注）</b></p>
+    <img src="images/jietu-square.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
     <p style="margin:4px 0 0 0"><b>教师界面（AI问答 + 文档库 + 教师上传文档）</b></p>
     <img src="images/jietu-vue-doclibrary.png" style="width:64%; border:1px solid #ddd; border-radius:6px; margin:8px 0;">
     <p style="margin:4px 0 0 0"><b>管理员后台-用户管理（新增老师账号、删除账号、用户列表）</b></p>
@@ -652,18 +654,41 @@ npm run dev      # 访问 http://localhost:5173（已代理到8000后端）</cod
     <table>
         <tr><th>路由分组</th><th>页面</th><th>鉴权</th></tr>
         <tr><td>公共</td><td>登录 /login、注册 /register、分享落地 /qa/share/:token、个人主页 /u/:userId</td><td>免登录</td></tr>
-        <tr><td>学生</td><td>AI问答 /student、问答历史 /student/history、个人主页 /student/profile、个人设置 /student/settings</td><td>登录+student</td></tr>
+        <tr><td>学生</td><td>AI问答 /student、问答广场 /student/square、问答历史 /student/history、个人主页 /student/profile、个人设置 /student/settings</td><td>登录+student</td></tr>
         <tr><td>老师</td><td>AI问答 /teacher、公开内容管理 /teacher/manage</td><td>登录+teacher</td></tr>
         <tr><td>管理员</td><td>后台首页 /admin、用户管理 /admin/users、公开内容管理 /admin/public</td><td>登录+admin</td></tr>
     </table>
     <h3>17.3 工程组织</h3>
     <ul>
-        <li>src/views：按角色组织的页面组件（AiChat / Login / Register / History / Profile / Settings / TeacherManage / AdminHome / UserManage / AdminPublicManage / ShareView / PublicProfile）</li>
+        <li>src/views：按角色组织的页面组件（AiChat / Login / Register / History / Profile / Settings / PublicSquare / TeacherManage / AdminHome / UserManage / AdminPublicManage / ShareView / PublicProfile）</li>
         <li>src/stores/user.js：Pinia 登录态（token + role），getters 提供 isStudent / isTeacher / isAdmin</li>
         <li>src/router/index.js：全量路由 + 全局前置守卫（登录校验 + 角色越权拦截）</li>
         <li>src/api/index.js：统一接口封装，自动携带 Authorization 头</li>
         <li>AiChat.vue：原生fetch + TextDecoder 流式解析SSE（打字机渲染），asking状态锁防重复提交</li>
         <li>vite.config.js：开发模式代理后端接口到 8000，host 0.0.0.0 支持局域网访问</li>
     </ul>
+
+    <h2>18. 问答广场与追加备注</h2>
+    <h3>18.1 问答广场（公开问答聚合浏览入口）</h3>
+    <p><b>背景</b>：早期版本中"公开"问答只展示在提问者个人主页（/u/userId），其他学生不知道主页链接就看不到他人的公开问答，知识共享链路断裂。为解决该问题，新增学生端<b>问答广场</b>页面，作为全校公开问答的聚合浏览入口。</p>
+    <ul>
+        <li><b>后端接口</b>：GET /qa/public/（登录学生/教师均可访问），联查 qa_records 与 users 表，按提问时间倒序返回全部 permission=public 的问答，并携带提问者用户名、备注、追加备注列表与教师评语</li>
+        <li><b>前端页面</b>：PublicSquare.vue，学生导航新增"问答广场"菜单（/student/square）；每条问答展示提问者名字（可点击进入其个人主页 /u/:userId）、问答内容、教师评语与追加备注列表</li>
+    </ul>
+    <h3>18.2 追加备注机制（qa_notes 表）</h3>
+    <p><b>设计原则</b>：备注为<b>追加式</b>而非覆盖式——学生每次添加备注都新增一条记录，保留全部历史批注，不覆盖旧内容。新增 qa_notes 表存储追加备注：</p>
+    <table>
+        <tr><th>字段</th><th>说明</th></tr>
+        <tr><td>qa_id</td><td>关联 qa_records.id（哪条问答）</td></tr>
+        <tr><td>user_id</td><td>添加备注的学生（联查 users 表取用户名展示）</td></tr>
+        <tr><td>content</td><td>备注内容（非空校验，前端 maxlength 200）</td></tr>
+        <tr><td>created_at</td><td>添加时间（列表按时间正序展示）</td></tr>
+    </table>
+    <h3>18.3 防刷屏：备注条数上限</h3>
+    <p>为避免单条问答备注过多，后端常量 QA_NOTES_LIMIT=10 限制备注总量：新增备注接口 POST /qa/{qa_id}/notes 会先统计该问答已有备注数（旧备注 note + 追加备注 qa_notes），达到 10 条后拒绝并返回 400"该问答备注已达上限（10条）"。经实测：连加 10 条全部成功，第 11 条被拦截。</p>
+    <h3>18.4 教师删除兜底与级联清理</h3>
+    <p>当某条公开问答的追加备注过多或内容不当，教师可直接整条删除该问答（DELETE /qa/{id}，仅限本人上传文档关联的公开问答），删除时<b>级联清理</b>其全部追加备注（qa_notes）；管理员删除任意公开问答同样级联清理。学生账号被删除时，其产生的全部问答及对应追加备注一并清理。经实测：教师删除问答后，该问答的 10 条备注在 qa_notes 表中全部消失。</p>
+    <h3>18.5 备注展示位置</h3>
+    <p>追加备注列表随问答同步展示在 7 个位置：问答广场、问答历史、个人主页、公开主页（/u/:userId）、分享落地页（/qa/share/:token）、教师公开内容管理、管理员公开内容总管理。每条备注显示添加者用户名、内容与时间，形成"学生提问 → 他人批注 → 教师点评/删除"的完整公开问答生态。</p>
 </body>
 </html>
