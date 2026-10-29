@@ -19,10 +19,12 @@ const menus = computed(() => {
   ]
   if (user.role === 'teacher') return [
     { path: '/teacher', label: 'AI 问答' },
+    { path: '/teacher/square', label: '问答广场' },
     { path: '/teacher/manage', label: '公开内容管理' }
   ]
   return [
     { path: '/admin', label: '后台首页' },
+    { path: '/admin/square', label: '问答广场' },
     { path: '/admin/users', label: '用户管理' },
     { path: '/admin/public', label: '公开内容管理' }
   ]

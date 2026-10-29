@@ -22,6 +22,7 @@ const routes = [
     meta: { requiresAuth: true, roles: ['teacher'] },
     children: [
       { path: '', name: 'teacher-home', component: () => import('../views/AiChat.vue'), meta: { title: 'AI 问答' } },
+      { path: 'square', name: 'teacher-square', component: () => import('../views/PublicSquare.vue'), meta: { title: '问答广场' } },
       { path: 'manage', name: 'teacher-manage', component: () => import('../views/TeacherManage.vue'), meta: { title: '公开内容管理' } }
     ]
   },
@@ -31,6 +32,7 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin'] },
     children: [
       { path: '', name: 'admin-home', component: () => import('../views/AdminHome.vue'), meta: { title: '后台首页' } },
+      { path: 'square', name: 'admin-square', component: () => import('../views/PublicSquare.vue'), meta: { title: '问答广场' } },
       { path: 'users', name: 'admin-users', component: () => import('../views/UserManage.vue'), meta: { title: '用户管理' } },
       { path: 'public', name: 'admin-public', component: () => import('../views/AdminPublicManage.vue'), meta: { title: '公开内容管理' } }
     ]
