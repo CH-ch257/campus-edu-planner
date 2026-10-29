@@ -60,57 +60,56 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 后端默认监听 `0.0.0.0:8000`（FastAPI），前端默认 `localhost:5173`（Vite），无需额外环境变量即可运行；若需改端口，在启动命令中追加 `--port` 参数即可。
 
-### 1. 克隆仓库
+### 1. 一次性环境准备（评审前完成，不计入 10 分钟）
 
-```bash
-git clone <你的仓库地址>.git
-cd campus-edu-planner
-```
+> 以下步骤只需做一次，耗时约 20–40 分钟（主要是下载模型）。**评委拿到代码时环境已就绪，直接走第 2 步即可。**
 
-### 2. 拉取本地大模型（约 2 分钟，需联网）
+1. **安装基础软件**：Python 3.10+、Node.js 18+、[Ollama](https://ollama.com/download)
+2. **拉取本地大模型**（约 1.9GB，按网速 3–15 分钟，需联网）：
+   ```bash
+   ollama pull qwen2.5:3b
+   ```
+3. **创建后端虚拟环境并安装依赖**：
+   ```bash
+   cd backend
+   python -m venv venv
+   venv\Scripts\activate        # Windows；Linux/macOS: source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+4. **预下载向量模型**（约 90MB）：首次启动后端时会自动下载 BAAI/bge-small-zh-v1.5，建议评审前先启动一次完成下载。
 
-```bash
-ollama pull qwen2.5:3b
-```
+### 2. 10 分钟复现（评审计时路径，实际约 5 分钟）
 
-### 3. 启动后端（backend/ 目录）
+> 以下为评委拿到代码后的完整复现流程，环境已就绪的前提下 **5 分钟内可跑通**。
 
-```bash
-cd backend
+1. **克隆仓库**（约 1 分钟）：
+   ```bash
+   git clone <你的仓库地址>.git
+   cd campus-edu-planner
+   ```
+2. **启动后端**（约 1 分钟）：进入 backend/ 目录，激活 venv 后启动，首次启动自动建库并加载向量模型：
+   ```bash
+   # 国内网络需配置 HF 镜像（海外可跳过；Windows PowerShell: $env:HF_ENDPOINT="https://hf-mirror.com"）
+   export HF_ENDPOINT=https://hf-mirror.com
+   uvicorn main:app --host 0.0.0.0
+   ```
+3. **启动前端**（约 1 分钟，另开一个终端）：
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+4. **访问与登录验证**（约 2 分钟）：浏览器打开 <http://localhost:5173>，用下方任一账号登录即可使用：
 
-# 创建虚拟环境并安装依赖
-python -m venv venv
-venv\Scripts\activate        # Windows；Linux/macOS: source venv/bin/activate
-pip install -r requirements.txt
+   | 角色 | 账号 | 密码 | 说明 |
+   |---|---|---|---|
+   | 高级管理员 | admin | admin123 | 用户管理、公开内容总管理 |
+   | 教师 | teacher | teacher123 | 文档上传/删除/评语 |
+   | 学生 | 自行注册 | — | 问答、历史、分享 |
 
-# 国内网络需配置 HF 镜像（海外可跳过）
-export HF_ENDPOINT=https://hf-mirror.com   # Windows PowerShell: $env:HF_ENDPOINT="https://hf-mirror.com"
+   > 局域网演示：同 WiFi 设备访问 `http://<本机IP>:5173`（服务已监听 0.0.0.0）。
 
-# 启动服务（监听 0.0.0.0:8000，首次启动自动建库并下载向量模型）
-uvicorn main:app --host 0.0.0.0
-```
-
-### 4. 启动前端（frontend/ 目录，另开一个终端）
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 5. 访问与登录
-
-浏览器打开 <http://localhost:5173>
-
-| 角色 | 账号 | 密码 | 说明 |
-|---|---|---|---|
-| 高级管理员 | admin | admin123 | 用户管理、公开内容总管理 |
-| 教师 | teacher | teacher123 | 文档上传/删除/评语 |
-| 学生 | 自行注册 | — | 问答、历史、分享 |
-
-> 局域网演示：同 WiFi 设备访问 `http://<本机IP>:5173`（服务已监听 0.0.0.0）。
-
-### 6. 快速验证（2 分钟）
+### 3. 快速验证（2 分钟）
 
 1. 用 `teacher/teacher123` 登录 → 上传 1 份 PDF/Word 文档 → 系统自动分类
 2. 注册学生账号登录 → 提问文档相关问题 → 得到带参考来源的回答（打字机流式输出）
