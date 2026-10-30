@@ -9,7 +9,6 @@ import socket
 import logging
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Header
 from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import (
     init_db, get_db, save_document, list_documents,
@@ -45,16 +44,11 @@ app = FastAPI(title="校园资料AI检索助手", version="1.0.0")
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# 挂载静态资源目录（docx-preview等前端库）
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# 前端统一由 frontend/（Vue3 工程）提供，旧版静态前端已移除
 
 @app.on_event("startup")
 def startup():
     init_db()
-
-@app.get("/", summary="前端首页")
-def read_root():
-    return FileResponse("index.html")
 
 
 @app.post("/register/", summary="用户注册")
