@@ -26,7 +26,7 @@
 
 ## 10 分钟极速复现
 
-> 全程离线运行，只需一次性联网下载模型。
+> 全程离线运行，只需一次性联网拉取对话模型（Ollama），向量模型已内置。
 
 ### 0. 环境要求
 
@@ -47,16 +47,9 @@
 | 前端 | Vue3 / Vite / Pinia / Vue Router / Element Plus | 前端工程（见 frontend/package.json） |
 | 系统 | Ollama + qwen2.5:3b | 本地大模型推理（约 1.9GB） |
 
-### 0.6 环境变量模板
+### 0.6 环境变量
 
-项目仅需一个可选环境变量（国内网络拉取向量模型时使用；海外可跳过）：
-
-```bash
-# 国内网络拉取 HuggingFace 模型走镜像（Windows PowerShell 写法见下）
-export HF_ENDPOINT=https://hf-mirror.com
-# Windows PowerShell:
-# $env:HF_ENDPOINT="https://hf-mirror.com"
-```
+本项目**无需配置任何环境变量**即可运行：中文向量模型已内置（`backend/models/`），对话模型通过本地 Ollama 调用，全程不访问 HuggingFace / 外部 API。
 
 后端默认监听 `0.0.0.0:8000`（FastAPI），前端默认 `localhost:5173`（Vite），无需额外环境变量即可运行；若需改端口，在启动命令中追加 `--port` 参数即可。
 
@@ -87,10 +80,8 @@ export HF_ENDPOINT=https://hf-mirror.com
    git clone <你的仓库地址>.git
    cd campus-edu-planner
    ```
-2. **启动后端**（约 1 分钟）：进入 backend/ 目录，激活 venv 后启动，首次启动自动建库并加载向量模型：
+2. **启动后端**（约 1 分钟）：进入 backend/ 目录，激活 venv 后启动，首次启动自动建库并加载内置向量模型（无需下载，冷启动实测约 1 秒）：
    ```bash
-   # 国内网络需配置 HF 镜像（海外可跳过；Windows PowerShell: $env:HF_ENDPOINT="https://hf-mirror.com"）
-   export HF_ENDPOINT=https://hf-mirror.com
    uvicorn main:app --host 0.0.0.0
    ```
 3. **启动前端**（约 1 分钟，另开一个终端）：
@@ -99,7 +90,7 @@ export HF_ENDPOINT=https://hf-mirror.com
    npm install
    npm run dev
    ```
-4. **访问与登录验证**（约 2 分钟）：浏览器打开 <http://localhost:5173>，用下方任一账号登录即可使用：
+4. **访问与登录验证**（约 2 分钟）：浏览器打开终端输出的 Local 地址（默认 <http://localhost:5173>，若端口被占用会自动切换，以终端输出为准），用下方任一账号登录即可使用：
 
    | 角色 | 账号 | 密码 | 说明 |
    |---|---|---|---|
