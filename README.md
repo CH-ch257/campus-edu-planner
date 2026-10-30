@@ -63,12 +63,20 @@
    ollama pull qwen2.5:3b
    ```
 3. **创建后端虚拟环境并安装依赖**：
-   ```bash
-   cd backend
-   python -m venv venv
-   venv\Scripts\activate        # Windows；Linux/macOS: source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+   - **cmd / PowerShell**：
+     ```powershell
+     cd backend
+     python -m venv venv
+     venv\Scripts\activate
+     pip install -r requirements.txt
+     ```
+   - **Git Bash**：
+     ```bash
+     cd backend
+     python -m venv venv
+     source venv/Scripts/activate
+     pip install -r requirements.txt
+     ```
 4. **向量模型已内置**：中文向量模型 bge-small-zh-v1.5（约 92MB）随项目存放在 `backend/models/`，无需下载，首次启动后端自动加载。
 
 ### 2. 10 分钟复现（评审计时路径，实际约 5 分钟）
@@ -80,10 +88,15 @@
    git clone <你的仓库地址>.git
    cd campus-edu-planner
    ```
-2. **启动后端**（约 1 分钟）：进入 backend/ 目录，激活 venv 后启动，首次启动自动建库并加载内置向量模型（无需下载，冷启动实测约 1 秒）：
-   ```bash
-   uvicorn main:app --host 0.0.0.0
-   ```
+2. **启动后端**（约 1 分钟）：进入 backend/ 目录启动，首次启动自动建库并加载内置向量模型（无需下载，冷启动实测约 1 秒）：
+   - **cmd / PowerShell**（Windows）：
+     ```powershell
+     venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000
+     ```
+   - **Git Bash**（注意用正斜杠）：
+     ```bash
+     venv/Scripts/python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000
+     ```
 3. **启动前端**（约 1 分钟，另开一个终端）：
    ```bash
    cd frontend
